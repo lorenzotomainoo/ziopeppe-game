@@ -1,1 +1,1693 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZIOPEPPE — Zombie Street Survival</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   STILI GENERALI — look "poster urbano": ombre dure, niente sfumature
+============================================================ */
+:root{
+  --bg:#101214; --panel:#1b1e22; --ink:#f2ead8; --sub:#a9b0b9;
+  --accent:#f2b632; --accent-dk:#8a5f10; --red:#e04b3a; --xp:#9d6bff;
+  --line:#3a3f46;
+  --r0:#aab3bc; --r1:#4fc3a1; --r2:#c77dff; --r3:#ffb020;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink); overflow:hidden;
+  font-family:'VT323', monospace; font-size:20px; line-height:1.25;
+  -webkit-font-smoothing:none; user-select:none;
+}
+canvas#game{position:fixed; inset:0; display:block}
+body.playing canvas#game{cursor:none}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+.screen{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10}
+.hidden{display:none !important}
+h1,h2,.bungee{font-family:'Bungee',cursive; font-weight:400; letter-spacing:.5px}
+button:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
 
+/* ---------- HUD ---------- */
+#hud{position:fixed; inset:0; pointer-events:none; z-index:5; padding:16px 20px}
+.hud-tl{position:absolute; top:14px; left:18px}
+.bar{position:relative; background:#14161a; border:3px solid #0b0c0e;
+  box-shadow:3px 3px 0 rgba(0,0,0,.45); margin-bottom:7px}
+.bar.hp{width:270px; height:24px}
+.bar.hp .fill{position:absolute; inset:2px auto 2px 2px; width:100%; background:var(--red)}
+.bar.xp{width:200px; height:16px}
+.bar.xp .fill{position:absolute; inset:2px auto 2px 2px; width:0%; background:var(--xp)}
+.bar .txt{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:18px; color:#fff; text-shadow:1px 1px 0 #000}
+#lvlText{font-size:19px; color:var(--xp); letter-spacing:1px; text-shadow:1px 1px 0 #000}
+.hud-tc{position:absolute; top:16px; left:50%; transform:translateX(-50%);
+  font-family:'Bungee'; font-size:22px; color:var(--ink); text-shadow:3px 3px 0 rgba(0,0,0,.6)}
+.hud-tr{position:absolute; top:16px; right:20px; display:flex; align-items:center; gap:8px;
+  background:rgba(16,18,20,.72); border:3px solid #0b0c0e; padding:4px 12px; box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+.hud-tr svg{width:20px; height:20px; color:var(--accent)}
+.hud-tr span{font-size:24px; color:var(--ink)}
+#fpsText{position:absolute; bottom:12px; left:18px; font-size:17px; color:#5b626b; text-shadow:1px 1px 0 #000}
+
+/* ---------- Banner ondata ---------- */
+#waveBanner{position:fixed; top:34%; left:0; right:0; text-align:center; pointer-events:none; z-index:6; opacity:0}
+#waveBanner .wb-big{font-family:'Bungee'; font-size:56px; color:var(--accent); text-shadow:5px 5px 0 rgba(0,0,0,.65)}
+#waveBanner .wb-sub{font-size:26px; color:var(--ink); text-shadow:2px 2px 0 #000; margin-top:4px}
+#waveBanner.show{animation:banner 2.4s ease forwards}
+@keyframes banner{
+  0%{opacity:0; transform:scale(.8)} 12%{opacity:1; transform:scale(1.04)}
+  20%{transform:scale(1)} 80%{opacity:1} 100%{opacity:0; transform:scale(1)}
+}
+
+/* ---------- Vignetta danno ---------- */
+#vignette{position:fixed; inset:0; pointer-events:none; z-index:7; opacity:0;
+  box-shadow:inset 0 0 0 14px rgba(190,42,28,.55), inset 0 0 120px rgba(150,20,10,.5)}
+
+/* ---------- Menu principale ---------- */
+#menu{background:rgba(13,15,17,.74); z-index:20}
+.menu-inner{width:min(960px,94vw); text-align:center}
+.menu-inner header h1{font-size:clamp(46px,8vw,84px); color:var(--accent);
+  text-shadow:6px 6px 0 rgba(0,0,0,.6); line-height:.95}
+.menu-inner header .tag{font-size:22px; color:var(--sub); letter-spacing:4px; margin-top:10px}
+.menu-main{display:flex; gap:34px; justify-content:center; align-items:stretch; margin-top:30px; flex-wrap:wrap}
+.portrait{background:var(--panel); border:3px solid #0b0c0e; box-shadow:5px 5px 0 rgba(0,0,0,.5);
+  padding:14px 14px 10px; align-self:flex-start}
+.portrait canvas{display:block; background:#26292e; border:2px solid #0e1013}
+.portrait figcaption{font-size:19px; color:var(--sub); margin-top:8px}
+.menu-opts{display:flex; flex-direction:column; gap:16px; width:400px; max-width:100%; text-align:left}
+.opt-label{font-size:19px; color:var(--accent); letter-spacing:3px; margin-bottom:6px}
+.maps{display:flex; gap:12px}
+.map-opt{flex:1; border:3px solid var(--line); background:var(--panel); padding:8px 8px 6px; transition:transform .12s}
+.map-opt canvas{display:block; width:100%; border:2px solid #0e1013}
+.map-opt .m-name{font-size:21px; color:var(--sub); margin-top:5px}
+.map-opt:hover{transform:translateY(-2px)}
+.map-opt.active{border-color:var(--accent); box-shadow:4px 4px 0 rgba(0,0,0,.5)}
+.map-opt.active .m-name{color:var(--accent)}
+.seg{display:flex; border:3px solid var(--line)}
+.seg button{flex:1; padding:8px 4px; font-family:'VT323'; font-size:21px; color:var(--sub);
+  background:var(--panel); border-right:3px solid var(--line); transition:background .1s}
+.seg button:last-child{border-right:none}
+.seg button:hover{background:#24282d}
+.seg button.active{background:var(--accent); color:#1a1408}
+#diffDesc{font-size:19px; color:var(--sub); min-height:46px; margin-top:8px}
+#playBtn{font-family:'Bungee'; font-size:26px; color:#1a1408; background:var(--accent);
+  padding:14px 10px 12px; border:3px solid #0b0c0e; box-shadow:0 6px 0 var(--accent-dk), 6px 10px 0 rgba(0,0,0,.4);
+  transition:transform .08s, box-shadow .08s; margin-top:4px}
+#playBtn:hover{transform:translate(-2px,-2px); box-shadow:0 8px 0 var(--accent-dk), 8px 12px 0 rgba(0,0,0,.4)}
+#playBtn:active{transform:translate(1px,3px); box-shadow:0 2px 0 var(--accent-dk)}
+.controls-bar{margin-top:26px; font-size:20px; color:var(--sub)}
+.controls-bar b{color:var(--ink); background:#24282d; border:2px solid var(--line); padding:1px 8px; margin:0 2px}
+
+/* ---------- Modal upgrade ---------- */
+#upgradeModal{background:rgba(10,11,13,.8); z-index:30; flex-direction:column}
+.up-title{font-family:'Bungee'; font-size:34px; color:var(--ink); text-shadow:4px 4px 0 rgba(0,0,0,.6)}
+.up-reason{font-size:24px; color:var(--accent); margin-top:6px}
+.up-stats{font-size:19px; color:var(--sub); margin-top:8px}
+.cards{display:flex; gap:22px; margin-top:28px; flex-wrap:wrap; justify-content:center}
+.card{width:216px; background:#1d2126; border:3px solid var(--rc,#888); padding:18px 16px 16px;
+  text-align:center; transform:rotate(var(--rot,0deg)) translateY(16px); opacity:0;
+  transition:transform .14s, border-color .14s; cursor:pointer; position:relative;
+  animation:cardIn .38s cubic-bezier(.2,1.4,.4,1) forwards; animation-delay:var(--d,0s)}
+@keyframes cardIn{to{opacity:1; transform:rotate(var(--rot,0deg)) translateY(0)}}
+.card:hover{transform:rotate(0deg) translateY(-8px) !important; border-color:var(--rc);
+  box-shadow:0 10px 0 -4px var(--rc), 8px 14px 0 rgba(0,0,0,.45)}
+.card .rar{font-size:17px; letter-spacing:3px; color:var(--rc)}
+.card .c-icon{width:76px; height:76px; margin:12px auto 10px; border:3px solid var(--rc);
+  border-radius:50%; display:flex; align-items:center; justify-content:center; background:#14161a}
+.card .c-icon svg{width:40px; height:40px; color:var(--rc)}
+.card h3{font-family:'Bungee'; font-size:15px; color:var(--ink); line-height:1.15}
+.card p{font-size:19px; color:var(--sub); margin-top:8px; min-height:48px}
+.card .key{position:absolute; top:8px; left:8px; font-size:17px; color:#5b626b; border:2px solid #33383f;
+  padding:0 6px; background:#14161a}
+.up-hint{font-size:19px; color:var(--sub); margin-top:26px}
+
+/* ---------- Game over / pausa ---------- */
+#gameover{background:rgba(13,15,17,.88); z-index:30; flex-direction:column}
+#gameover h2{font-size:clamp(30px,5vw,52px); color:var(--red); text-shadow:5px 5px 0 rgba(0,0,0,.6)}
+#gameover .go-sub{font-size:24px; color:var(--sub); margin-top:8px}
+.go-stats{margin:28px 0 6px; border:3px solid var(--line); background:var(--panel);
+  box-shadow:5px 5px 0 rgba(0,0,0,.5); padding:18px 34px}
+.go-stats .row{display:flex; justify-content:space-between; gap:60px; font-size:25px; padding:4px 0}
+.go-stats .row b{color:var(--accent)}
+.menu-btn{font-family:'Bungee'; font-size:20px; color:#1a1408; background:var(--accent);
+  padding:12px 26px 10px; border:3px solid #0b0c0e; box-shadow:0 5px 0 var(--accent-dk); margin-top:22px}
+.menu-btn:hover{transform:translateY(-2px)}
+.menu-btn:active{transform:translateY(2px); box-shadow:0 1px 0 var(--accent-dk)}
+#pauseOverlay{background:rgba(13,15,17,.7); z-index:25; flex-direction:column}
+#pauseOverlay h2{font-size:44px; color:var(--ink); text-shadow:4px 4px 0 rgba(0,0,0,.6)}
+#pauseOverlay p{font-size:23px; color:var(--sub); margin-top:10px}
+</style>
+</head>
+<body>
+
+<!-- ============ Libreria icone SVG (inline, stroke-based) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-rof" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="6.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-dmg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 8h9a6 4 0 0 1 0 8H5z"/><path d="M1 10h2.5M1 14h2.5"/>
+    </symbol>
+    <symbol id="i-spd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5l6.5 7L4 19M12.5 5l6.5 7-6.5 7"/>
+    </symbol>
+    <symbol id="i-pierce" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 4v16M10.5 4v16"/><path d="M1 12h15M13 7.5l5 4.5-5 4.5"/>
+    </symbol>
+    <symbol id="i-hp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <path d="M12 20C5.5 14.5 3.5 10.5 5.5 7.5s5.5-2 6.5 1c1-3 4.5-4 6.5-1s-.5 7-6.5 12.5z"/>
+    </symbol>
+    <symbol id="i-magnet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <path d="M7 4.5v6.5a5 5 0 0 0 10 0V4.5"/><path d="M7 4.5h3.4M13.6 4.5H17M8.7 8h.01M15.3 8h.01"/>
+    </symbol>
+    <symbol id="i-multi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21V4M12 4l-2.6 3.6M12 4l2.6 3.6"/><path d="M12 21L5 8M5 8l-.4 4M5 8l4 .6"/><path d="M12 21l7-13M19 8l.4 4M19 8l-4 .6"/>
+    </symbol>
+    <symbol id="i-regen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20.5C6 15.5 4 11.5 6 8.7s4.8-1.7 6 .8c1.2-2.5 4-3 6-.8s0 6.8-6 11.8z"/><path d="M12 10.5v5M9.5 13h5"/>
+    </symbol>
+    <symbol id="i-crit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <path d="M12 2l2.1 7.9L22 12l-7.9 2.1L12 22l-2.1-7.9L2 12l7.9-2.1z"/>
+    </symbol>
+    <symbol id="i-armor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <path d="M12 2.5L20 5.8v6c0 5.2-4.1 8.4-8 9.7-3.9-1.3-8-4.5-8-9.7v-6z"/><path d="M12 6.5v10"/>
+    </symbol>
+    <symbol id="i-bullet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13 4l8 8-8 8z"/><path d="M2 8.5h6M2 12h8M2 15.5h6"/>
+    </symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.6"/>
+      <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M19.4 4.6l-2.1 2.1M6.7 17.3l-2.1 2.1"/>
+    </symbol>
+  </defs>
+</svg>
+
+<canvas id="game"></canvas>
+
+<!-- ============ HUD di gioco ============ -->
+<div id="hud" class="hidden">
+  <div class="hud-tl">
+    <div class="bar hp"><div class="fill" id="hpFill"></div><div class="txt" id="hpText">100/100</div></div>
+    <div class="bar xp"><div class="fill" id="xpFill"></div></div>
+    <div id="lvlText">LIVELLO 1</div>
+  </div>
+  <div class="hud-tc" id="waveText">ONDATA 1</div>
+  <div class="hud-tr">
+    <svg><use href="#i-gear"/></svg><span id="lootText">0</span>
+  </div>
+  <div id="fpsText">-- FPS</div>
+</div>
+
+<div id="waveBanner"><div class="wb-big"></div><div class="wb-sub"></div></div>
+<div id="vignette"></div>
+
+<!-- ============ Menu principale ============ -->
+<div id="menu" class="screen">
+  <div class="menu-inner">
+    <header>
+      <h1>ZIOPEPPE</h1>
+      <p class="tag">DIFENDI IL QUARTIERE — UN BOSSOLO ALLA VOLTA</p>
+    </header>
+    <div class="menu-main">
+      <figure class="portrait">
+        <canvas id="portrait" width="240" height="240"></canvas>
+        <figcaption>«Nessuno si prende il quartiere di Zio Peppe.»</figcaption>
+      </figure>
+      <div class="menu-opts">
+        <div>
+          <div class="opt-label">MAPPA</div>
+          <div class="maps">
+            <button class="map-opt active" id="mapCity">
+              <canvas id="prevCity" width="164" height="104"></canvas>
+              <div class="m-name">Città</div>
+            </button>
+            <button class="map-opt" id="mapCountry">
+              <canvas id="prevCountry" width="164" height="104"></canvas>
+              <div class="m-name">Campagna</div>
+            </button>
+          </div>
+        </div>
+        <div>
+          <div class="opt-label">DIFFICOLTÀ</div>
+          <div class="seg" id="diffSeg">
+            <button data-d="facile">FACILE</button>
+            <button data-d="normale" class="active">NORMALE</button>
+            <button data-d="difficile">DIFFICILE</button>
+          </div>
+          <div id="diffDesc"></div>
+        </div>
+        <button id="playBtn">GIOCA</button>
+      </div>
+    </div>
+    <footer class="controls-bar">
+      <b>W A S D</b> muoviti &nbsp;·&nbsp; <b>MOUSE</b> mira e spara &nbsp;·&nbsp; <b>ESC</b> pausa
+    </footer>
+  </div>
+</div>
+
+<!-- ============ Modal upgrade ============ -->
+<div id="upgradeModal" class="screen hidden">
+  <div class="up-title" id="upTitle"></div>
+  <div class="up-reason" id="upReason"></div>
+  <div class="up-stats" id="upStats"></div>
+  <div class="cards" id="cards"></div>
+  <div class="up-hint">clicca una carta — o premi 1 · 2 · 3</div>
+</div>
+
+<!-- ============ Game over ============ -->
+<div id="gameover" class="screen hidden">
+  <h2>ZIOPEPPE È CADUTO</h2>
+  <div class="go-sub">…ma il quartiere ricorderà.</div>
+  <div class="go-stats">
+    <div class="row"><span>Ondata raggiunta</span><b id="goWave">1</b></div>
+    <div class="row"><span>Livello</span><b id="goLevel">1</b></div>
+    <div class="row"><span>Zombie abbattuti</span><b id="goKills">0</b></div>
+    <div class="row"><span>Loot raccolto</span><b id="goLoot">0</b></div>
+    <div class="row"><span>Sopravvissuto per</span><b id="goTime">0:00</b></div>
+  </div>
+  <button class="menu-btn" id="goMenuBtn">TORNA AL MENU PRINCIPALE</button>
+</div>
+
+<!-- ============ Pausa ============ -->
+<div id="pauseOverlay" class="screen hidden">
+  <h2>PAUSA</h2>
+  <p>premi <b style="color:var(--ink)">ESC</b> per riprendere la partita</p>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   RNG MATH — helper casuali e campionamento pesato
+   Tutto il caso del gioco passa da qui: range uniformi, pick
+   semplici e weighted sampling (usato per le carte upgrade).
+============================================================ */
+const TAU = Math.PI * 2;
+const rand    = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const pick    = arr => arr[(Math.random() * arr.length) | 0];
+const clamp   = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp    = (a, b, t) => a + (b - a) * t;
+const dist    = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+
+/* ============================================================
+   CONFIG — mondo, difficoltà, tipi di zombie, curva XP
+============================================================ */
+const WORLD = { w: 2240, h: 1600 };
+const ALIVE_CAP = 40; // max zombie simultanei in campo (performance + ritmo)
+
+const DIFFS = {
+  facile:   { label:'Facile',   zHp:.8,  zDmg:.7,  zSpd:.9,  density:.75, xp:.9,  loot:.8,  rarity:.6,
+              desc:'Zombie lenti e molli. Un giro di riscaldamento, coi guanti.' },
+  normale:  { label:'Normale',  zHp:1,   zDmg:1,   zSpd:1,   density:1,   xp:1,   loot:1,   rarity:1,
+              desc:'L\'equilibrio di sempre. Il quartiere come lo conosci.' },
+  difficile:{ label:'Difficile',zHp:1.5, zDmg:1.4, zSpd:1.12,density:1.35,xp:1.35,loot:1.6, rarity:2.2,
+              desc:'Orde dense e colpi cattivi — ma XP, loot e probabilità di carte Epiche/Leggendarie molto più ricche.' },
+};
+
+const ZTYPES = {
+  walker: { r:15, hp:26, dmg:9,  spd:55,  xp:2, col:'#7d9a58', skin:'#b7c79a' },
+  runner: { r:12, hp:14, dmg:7,  spd:102, xp:2, col:'#a9c274', skin:'#cfd9a4' },
+  brute:  { r:23, hp:92, dmg:20, spd:38,  xp:7, col:'#5c7042', skin:'#9dad7c' },
+};
+
+const xpForLevel = lvl => Math.round(6 + lvl * 4 + lvl * lvl * 0.9);
+
+/* ============================================================
+   CANVAS & VIEWPORT
+============================================================ */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let vw = innerWidth, vh = innerHeight, dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vw = innerWidth; vh = innerHeight;
+  canvas.width = vw * dpr; canvas.height = vh * dpr;
+  canvas.style.width = vw + 'px'; canvas.style.height = vh + 'px';
+  refreshPortraitRect();
+}
+addEventListener('resize', resize);
+
+// canvas offscreen: mappa statica prerenderizzata + layer decals (sangue permanente)
+const mapCanvas = document.createElement('canvas');
+mapCanvas.width = WORLD.w; mapCanvas.height = WORLD.h;
+const mapCtx = mapCanvas.getContext('2d');
+const decalCanvas = document.createElement('canvas');
+decalCanvas.width = WORLD.w; decalCanvas.height = WORLD.h;
+const decalCtx = decalCanvas.getContext('2d');
+
+// rettangolo di vista (coordinate mondo) ricalcolato a ogni render, usato dal culling
+const view = { l:0, t:0, r:0, b:0 };
+function inView(x, y, m) {
+  return x > view.l - m && x < view.r + m && y > view.t - m && y < view.b + m;
+}
+
+/* ============================================================
+   AUDIO — piccoli SFX procedurali con WebAudio (nessun asset)
+============================================================ */
+let actx = null, master = null, noiseBuf = null;
+function initAudio() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain(); master.gain.value = .32; master.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * .4, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  } catch (e) { /* audio non disponibile: si gioca in silenzio */ }
+}
+function tone(f0, f1, dur, type, vol) {
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+  o.type = type; o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
+}
+function noise(dur, vol, freq) {
+  if (!actx) return;
+  const s = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter(), t = actx.currentTime;
+  s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + .02);
+}
+// throttle: con rateo di fuoco alto evitiamo di creare decine di nodi al secondo
+const sfxGate = Object.create(null);
+function sfxGateOk(name, gapMs) {
+  const t = performance.now();
+  if (t - (sfxGate[name] || 0) < gapMs) return false;
+  sfxGate[name] = t; return true;
+}
+const sfx = {
+  shoot()   { if (sfxGateOk('shoot', 45)) { tone(210, 65, .09, 'square', .12); noise(.05, .1, 3500); } },
+  hit()     { if (sfxGateOk('hit', 35)) noise(.06, .14, 1800); },
+  die()     { noise(.22, .2, 900); tone(150, 40, .18, 'sawtooth', .08); },
+  hurt()     { tone(120, 55, .22, 'sawtooth', .18); noise(.1, .1, 700); },
+  pickup()  { if (sfxGateOk('pick', 30)) tone(660, 990, .08, 'sine', .1); },
+  coin()    { if (sfxGateOk('coin', 30)) tone(880, 1320, .07, 'triangle', .12); },
+  level()   { tone(440, 660, .1, 'square', .1); setTimeout(()=>tone(660, 990, .14, 'square', .1), 90); },
+  wave()    { tone(180, 120, .3, 'sawtooth', .1); },
+};
+
+/* ============================================================
+   INPUT — tastiera + mouse
+============================================================ */
+const keys = { w:false, a:false, s:false, d:false };
+const mouse = { x: vw/2, y: vh/2, down:false };
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k in keys) keys[k] = true;
+  if (k === 'escape') togglePause();
+  if (state === 'upgrade' && ['1','2','3'].includes(k)) chooseUpgrade(+k - 1);
+});
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (k in keys) keys[k] = false; });
+addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+addEventListener('mousedown', e => { if (e.button === 0) mouse.down = true; });
+addEventListener('mouseup',   e => { if (e.button === 0) mouse.down = false; });
+addEventListener('blur', () => { mouse.down = false; keys.w = keys.a = keys.s = keys.d = false; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('pointerdown', initAudio, { once:false });
+addEventListener('keydown', initAudio, { once:true });
+
+/* ============================================================
+   ENTITY MANAGEMENT & POOLING
+   Pool con FREE-LIST: obtain e release sono O(1), zero allocazioni
+   nel game loop e zero leak da GC. `activeCount` tiene il numero
+   reale di entità vive (non la dimensione storica del pool).
+============================================================ */
+function makePool(factory) {
+  const items = [], free = [];
+  return {
+    items, free,
+    get activeCount() { return items.length - free.length; },
+    obtain() {
+      const it = free.length ? free.pop() : (items.push(factory()), items[items.length - 1]);
+      it.active = true; return it;
+    },
+    release(it) { if (it.active) { it.active = false; free.push(it); } },
+    clear() { free.length = 0; for (const it of items) { it.active = false; free.push(it); } },
+  };
+}
+const bullets = makePool(() => ({ active:false, x:0, y:0, vx:0, vy:0, r:4, dmg:0, pierce:0, hits:[], life:0, crit:false }));
+const zombies = makePool(() => ({ active:false, mode:'hunt', x:0, y:0, r:15, hp:1, maxHp:1, dmg:1, spd:50,
+  type:'walker', ang:0, ph:0, flash:0, pushX:0, pushY:0, wdir:0, wtimer:0, spVariant:0, _seq:0 }));
+const particles = makePool(() => ({ active:false, x:0, y:0, vx:0, vy:0, life:0, maxLife:1, size:2, col:'#fff', text:'' }));
+let orbs = [];   // orbs XP: {x,y,v,pull,t}
+let loots = [];  // monete/ingranaggi: {x,y,v,t,rot}
+
+function addParticle(x, y, vx, vy, life, size, col, text) {
+  if (particles.activeCount >= 300) return; // cap sul numero di particelle ATTIVE
+  const p = particles.obtain();
+  p.x=x; p.y=y; p.vx=vx; p.vy=vy; p.life=life; p.maxLife=life; p.size=size; p.col=col; p.text=text||'';
+}
+
+/* ============================================================
+   STATO DI GIOCO
+============================================================ */
+let state = 'menu';               // menu | playing | upgrade | paused | dead
+let selectedMap = 'city', selectedDiff = 'normale';
+let diff = DIFFS[selectedDiff];
+let obstacles = [];                // {type:'rect',x,y,w,h} | {type:'circle',x,y,r}
+let canopy = [];                   // chiome degli alberi (sprite prerenderizzati)
+let mapStart = { x:1120, y:800 };
+let cam = { x:0, y:0 }, shakePow = 0, dmgFlash = 0;
+let time = 0, runTime = 0, kills = 0;
+let wave = 0, waveActive = false, waveTotal = 0, waveSpawned = 0, zAlive = 0;
+let spawnTimer = 0, spawnInterval = 2, groupSize = 4, nextWaveDelay = 0;
+let currentOffers = [], upgradeOpen = false;
+
+// *** FIX DEL CRASH: la funzione shake era chiamata da shoot()/hitPlayer()/
+// killZombie() ma non era mai stata definita -> ReferenceError che uccideva il loop ***
+function shake(p) { shakePow = Math.min(20, shakePow + p); }
+
+const player = {
+  x:0, y:0, r:15, aim:0, moveAngle:0, moving:false, walkT:0,
+  hp:100, maxHp:100, speed:180, fireRate:3.6, damage:12, bulletSpeed:640,
+  pierce:0, multishot:1, pickupRange:80, regen:0, crit:0, armor:0,
+  fireCd:0, invuln:0, muzzle:0, level:1, xp:0, xpNext:xpForLevel(1), loot:0,
+};
+function resetPlayer() {
+  Object.assign(player, {
+    x:mapStart.x, y:mapStart.y, aim:0, moveAngle:0, moving:false, walkT:0,
+    hp:100, maxHp:100, speed:180, fireRate:3.6, damage:12, bulletSpeed:640,
+    pierce:0, multishot:1, pickupRange:80, regen:0, crit:0, armor:0,
+    fireCd:0, invuln:0, muzzle:0, level:1, xp:0, xpNext:xpForLevel(1), loot:0,
+  });
+}
+
+/* ============================================================
+   COLLISION DETECTION
+   Primitive cerchio/rettangolo + due indici spaziali:
+   - obGrid: griglia statica degli ostacoli (costruita con la mappa)
+   - zGrid:  spatial hash degli zombie, ricostruita ogni frame
+   Ogni query collisione passa da O(tutte le entità) a O(vicini).
+============================================================ */
+function circleRectOverlap(cx, cy, cr, o) {
+  const nx = clamp(cx, o.x, o.x + o.w), ny = clamp(cy, o.y, o.y + o.h);
+  const dx = cx - nx, dy = cy - ny;
+  return (dx*dx + dy*dy) < cr*cr ? { nx, ny, dx, dy } : null;
+}
+function resolveCircleRect(ent, o) {
+  const hit = circleRectOverlap(ent.x, ent.y, ent.r, o);
+  if (!hit) return;
+  const d = Math.hypot(hit.dx, hit.dy);
+  if (d > 0.0001) {
+    const push = (ent.r - d) / d;
+    ent.x += hit.dx * push; ent.y += hit.dy * push;
+  } else {
+    // centro dentro il rettangolo: spinta lungo l'asse di minima penetrazione
+    const l = ent.x - o.x, r = o.x + o.w - ent.x, t = ent.y - o.y, b = o.y + o.h - ent.y;
+    const m = Math.min(l, r, t, b);
+    if (m === l) ent.x = o.x - ent.r; else if (m === r) ent.x = o.x + o.w + ent.r;
+    else if (m === t) ent.y = o.y - ent.r; else ent.y = o.y + o.h + ent.r;
+  }
+}
+function resolveCircleCircle(ent, o) {
+  const dx = ent.x - o.x, dy = ent.y - o.y, d = Math.hypot(dx, dy), min = ent.r + o.r;
+  if (d < min && d > 0.0001) {
+    const push = (min - d) / d;
+    ent.x += dx * push; ent.y += dy * push;
+  }
+}
+
+/* ---------- Griglia statica degli ostacoli ---------- */
+const OB_CELL = 140;
+const obGrid = { cols:0, rows:0, cells:[], stamp:0 };
+function buildObstacleGrid() {
+  obGrid.cols = Math.max(1, Math.ceil(WORLD.w / OB_CELL));
+  obGrid.rows = Math.max(1, Math.ceil(WORLD.h / OB_CELL));
+  obGrid.cells = new Array(obGrid.cols * obGrid.rows);
+  for (const o of obstacles) {
+    o._s = 0; // timbro per la deduplica nelle query
+    const x1 = o.type === 'rect' ? o.x : o.x - o.r, y1 = o.type === 'rect' ? o.y : o.y - o.r;
+    const x2 = o.type === 'rect' ? o.x + o.w : o.x + o.r, y2 = o.type === 'rect' ? o.y + o.h : o.y + o.r;
+    const c0 = clamp(Math.floor(x1 / OB_CELL), 0, obGrid.cols - 1);
+    const c1 = clamp(Math.floor(x2 / OB_CELL), 0, obGrid.cols - 1);
+    const r0 = clamp(Math.floor(y1 / OB_CELL), 0, obGrid.rows - 1);
+    const r1 = clamp(Math.floor(y2 / OB_CELL), 0, obGrid.rows - 1);
+    for (let gy = r0; gy <= r1; gy++)
+      for (let gx = c0; gx <= c1; gx++) {
+        const idx = gy * obGrid.cols + gx;
+        (obGrid.cells[idx] || (obGrid.cells[idx] = [])).push(o);
+      }
+  }
+}
+// visita una sola volta ogni ostacolo le cui celle intersecano il cerchio di query
+function forEachObstacleNear(x, y, r, fn) {
+  if (!obGrid.cells.length) return;
+  const c0 = clamp(Math.floor((x - r) / OB_CELL), 0, obGrid.cols - 1);
+  const c1 = clamp(Math.floor((x + r) / OB_CELL), 0, obGrid.cols - 1);
+  const r0 = clamp(Math.floor((y - r) / OB_CELL), 0, obGrid.rows - 1);
+  const r1 = clamp(Math.floor((y + r) / OB_CELL), 0, obGrid.rows - 1);
+  obGrid.stamp++;
+  const s = obGrid.stamp;
+  for (let gy = r0; gy <= r1; gy++)
+    for (let gx = c0; gx <= c1; gx++) {
+      const cell = obGrid.cells[gy * obGrid.cols + gx];
+      if (!cell) continue;
+      for (const o of cell) {
+        if (o._s === s) continue;
+        o._s = s;
+        fn(o);
+      }
+    }
+}
+function collideObstacles(ent) {
+  forEachObstacleNear(ent.x, ent.y, ent.r + 4, o => {
+    if (o.type === 'rect') resolveCircleRect(ent, o);
+    else resolveCircleCircle(ent, o);
+  });
+}
+function bulletBlocked(b) {
+  let blocked = false;
+  forEachObstacleNear(b.x, b.y, b.r + 30, o => {
+    if (blocked) return;
+    if (o.type === 'rect') { if (circleRectOverlap(b.x, b.y, b.r, o)) blocked = true; }
+    else if (dist(b.x, b.y, o.x, o.y) < b.r + o.r) blocked = true;
+  });
+  return blocked;
+}
+function pointBlocked(x, y, r) {
+  let blocked = false;
+  forEachObstacleNear(x, y, r + 30, o => {
+    if (blocked) return;
+    if (o.type === 'rect') { if (circleRectOverlap(x, y, r, o)) blocked = true; }
+    else if (dist(x, y, o.x, o.y) < r + o.r) blocked = true;
+  });
+  return blocked;
+}
+
+/* ---------- Spatial hash degli zombie (ricostruita a ogni frame) ---------- */
+const Z_CELL = 96;
+const zGrid = {
+  cols: Math.max(1, Math.ceil(WORLD.w / Z_CELL)),
+  rows: Math.max(1, Math.ceil(WORLD.h / Z_CELL)),
+};
+zGrid.cells = new Array(zGrid.cols * zGrid.rows);
+function zGridRebuild() {
+  for (const cell of zGrid.cells) if (cell) cell.length = 0;
+  let seq = 0;
+  for (const z of zombies.items) {
+    if (!z.active) continue;
+    z._seq = seq++;
+    const gx = clamp((z.x / Z_CELL) | 0, 0, zGrid.cols - 1);
+    const gy = clamp((z.y / Z_CELL) | 0, 0, zGrid.rows - 1);
+    const idx = gy * zGrid.cols + gx;
+    (zGrid.cells[idx] || (zGrid.cells[idx] = [])).push(z);
+  }
+}
+// fn ritorna true per interrompere la scansione (es. proiettile esaurito)
+function zGridNear(x, y, fn) {
+  const gx = clamp((x / Z_CELL) | 0, 0, zGrid.cols - 1);
+  const gy = clamp((y / Z_CELL) | 0, 0, zGrid.rows - 1);
+  const x0 = Math.max(0, gx - 1), x1 = Math.min(zGrid.cols - 1, gx + 1);
+  const y0 = Math.max(0, gy - 1), y1 = Math.min(zGrid.rows - 1, gy + 1);
+  for (let cy = y0; cy <= y1; cy++)
+    for (let cx = x0; cx <= x1; cx++) {
+      const cell = zGrid.cells[cy * zGrid.cols + cx];
+      if (!cell) continue;
+      for (let i = 0; i < cell.length; i++)
+        if (fn(cell[i])) return;
+    }
+}
+
+/* ============================================================
+   MAPPE / AMBIENTE — generazione + prerender su canvas offscreen
+============================================================ */
+function rrect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+const CAR_COLORS = ['#b5533c','#c8a13e','#6e8f8a','#8d8f96','#4c5a6e','#7c5a49'];
+
+function drawCar(c, x, y, horiz, col) {
+  const w = horiz ? 50 : 24, h = horiz ? 24 : 50;
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(x - w/2 + 4, y - h/2 + 4, w, h); // ombra netta
+  c.fillStyle = col; c.fillRect(x - w/2, y - h/2, w, h);
+  c.strokeStyle = '#1d2024'; c.lineWidth = 2; c.strokeRect(x - w/2, y - h/2, w, h);
+  c.fillStyle = '#22262b'; // finestrini
+  if (horiz) { c.fillRect(x - 12, y - h/2 + 3, 10, h - 6); c.fillRect(x + 3, y - h/2 + 3, 9, h - 6); }
+  else       { c.fillRect(x - w/2 + 3, y - 12, w - 6, 10); c.fillRect(x - w/2 + 3, y + 3, w - 6, 9); }
+  c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x - w/2 + 3, y - h/2 + 3, w - 6, 4); // riflesso tetto
+}
+
+// chioma d'albero prerenderizzata: 1 drawImage invece di ~8 path fill per frame
+function bakeTree(r, tone, seed) {
+  const S = Math.ceil(r * 2) + 18;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const c = cv.getContext('2d');
+  c.translate(S / 2, S / 2);
+  c.fillStyle = 'rgba(0,0,0,.22)';
+  c.beginPath(); c.ellipse(6, 8, r * .95, r * .7, 0, 0, TAU); c.fill();
+  c.fillStyle = tone;
+  c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.14)';
+  c.beginPath(); c.arc(-r * .25, -r * .25, r * .55, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(0,0,0,.14)';
+  for (let i = 0; i < 4; i++) {
+    const a = seed + i * 1.7;
+    c.beginPath(); c.arc(Math.cos(a) * r * .55, Math.sin(a) * r * .55, r * .22, 0, TAU); c.fill();
+  }
+  return cv;
+}
+
+function buildCity() {
+  obstacles = []; canopy = [];
+  const c = mapCtx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  // asfalto con macchie
+  c.fillStyle = '#33363b'; c.fillRect(0, 0, WORLD.w, WORLD.h);
+  for (let i = 0; i < 130; i++) {
+    c.fillStyle = Math.random() < .5 ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.03)';
+    c.beginPath(); c.ellipse(rand(0, WORLD.w), rand(0, WORLD.h), rand(14, 60), rand(10, 40), rand(0, TAU), 0, TAU); c.fill();
+  }
+  // layout: strade verticali [0-150][690-830][1370-1510][2050-2240], orizzontali [0-120][660-810][1450-1600]
+  const vRoads = [75, 760, 1440, 2145], hRoads = [60, 735, 1525];
+  // linea centrale tratteggiata (a segmenti, saltando gli incroci)
+  c.strokeStyle = '#c9a23f'; c.lineWidth = 3; c.setLineDash([26, 22]);
+  for (const vx of vRoads) for (const [y1, y2] of [[120, 660], [810, 1450]]) {
+    c.beginPath(); c.moveTo(vx, y1); c.lineTo(vx, y2); c.stroke();
+  }
+  for (const hy of hRoads) for (const [x1, x2] of [[150, 690], [830, 1370], [1510, 2050]]) {
+    c.beginPath(); c.moveTo(x1, hy); c.lineTo(x2, hy); c.stroke();
+  }
+  c.setLineDash([]);
+  // strisce pedonali agli incroci principali
+  c.fillStyle = 'rgba(235,235,230,.75)';
+  for (const vx of [760, 1440]) for (const hy of [735, 1525]) {
+    for (let i = -3; i <= 3; i++) { c.fillRect(vx + i*14 - 4, hy - 92, 8, 26); c.fillRect(vx + i*14 - 4, hy + 66, 8, 26); }
+  }
+  // tombini
+  for (let i = 0; i < 14; i++) {
+    const x = rand(60, WORLD.w - 60), y = rand(60, WORLD.h - 60);
+    c.fillStyle = '#23262a'; c.beginPath(); c.arc(x, y, 9, 0, TAU); c.fill();
+    c.strokeStyle = '#43474d'; c.lineWidth = 2; c.stroke();
+  }
+  // isolati (marciapiedi + edifici)
+  const blocksX = [[150, 690], [830, 1370], [1510, 2050]], blocksY = [[120, 660], [810, 1450]];
+  for (const [bx1, bx2] of blocksX) for (const [by1, by2] of blocksY) {
+    const bw = bx2 - bx1, bh = by2 - by1;
+    c.fillStyle = '#767a80'; c.fillRect(bx1, by1, bw, bh);            // marciapiede
+    c.strokeStyle = '#94989e'; c.lineWidth = 3; c.strokeRect(bx1 + 1.5, by1 + 1.5, bw - 3, bh - 3);
+    c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 2;               // giunti lastre
+    for (let gx = bx1 + 56; gx < bx2; gx += 56) { c.beginPath(); c.moveTo(gx, by1); c.lineTo(gx, by2); c.stroke(); }
+    for (let gy = by1 + 56; gy < by2; gy += 56) { c.beginPath(); c.moveTo(bx1, gy); c.lineTo(bx2, gy); c.stroke(); }
+    // idrante decorativo
+    c.fillStyle = '#c24838'; c.beginPath(); c.arc(bx1 + 14, by1 + 14, 3.5, 0, TAU); c.fill();
+    const ix = bx1 + 26, iy = by1 + 26, iw = bw - 52, ih = bh - 52;
+    if (Math.random() < .22) {
+      // cortile interno con auto e alberello
+      c.fillStyle = '#5d6a4f'; c.fillRect(ix, iy, iw, ih);
+      for (let k = 0; k < 2; k++) {
+        const cx2 = rand(ix + 60, ix + iw - 60), cy2 = rand(iy + 40, iy + ih - 40);
+        const horiz = Math.random() < .5, col = pick(CAR_COLORS);
+        drawCar(c, cx2, cy2, horiz, col);
+        obstacles.push(horiz
+          ? { type:'rect', x:cx2 - 25, y:cy2 - 12, w:50, h:24 }
+          : { type:'rect', x:cx2 - 12, y:cy2 - 25, w:24, h:50 });
+      }
+      const tx = ix + iw * rand(.25, .75), ty = iy + ih * rand(.25, .75);
+      obstacles.push({ type:'circle', x:tx, y:ty, r:24 });
+      const tr = 38;
+      canopy.push({ x:tx, y:ty, r:tr, spr: bakeTree(tr, pick(['#3f6b3a', '#38632f', '#467440']), rand(0, 9)) });
+    } else if (Math.random() < .5) {
+      // edificio unico
+      const m = rand(0, 40);
+      const r = { x:ix + m, y:iy + m, w:iw - m * 2, h:ih - m * 2 };
+      drawRoof(c, r); obstacles.push({ type:'rect', ...r });
+    } else {
+      // due edifici con vicolo
+      if (Math.random() < .5) {
+        const split = rand(.35, .65) * iw, gap = 42;
+        const r1 = { x:ix, y:iy, w:split - gap/2, h:ih }, r2 = { x:ix + split + gap/2, y:iy, w:iw - split - gap/2, h:ih };
+        drawRoof(c, r1); drawRoof(c, r2); obstacles.push({ type:'rect', ...r1 }, { type:'rect', ...r2 });
+      } else {
+        const split = rand(.35, .65) * ih, gap = 42;
+        const r1 = { x:ix, y:iy, w:iw, h:split - gap/2 }, r2 = { x:ix, y:iy + split + gap/2, w:iw, h:ih - split - gap/2 };
+        drawRoof(c, r1); drawRoof(c, r2); obstacles.push({ type:'rect', ...r1 }, { type:'rect', ...r2 });
+      }
+    }
+  }
+  // auto parcheggiate lungo le strade (hitbox coerenti con l'orientamento)
+  for (const vx of vRoads) {
+    for (const y of [rand(240, 540), rand(980, 1330)]) {
+      if (Math.random() < .6) {
+        const cx2 = vx + pick([-1, 1]) * rand(34, 46), col = pick(CAR_COLORS);
+        drawCar(c, cx2, y, false, col);
+        obstacles.push({ type:'rect', x:cx2 - 12, y:y - 25, w:24, h:50 });
+      }
+    }
+  }
+  for (const hy of hRoads) {
+    for (const x of [rand(260, 560), rand(950, 1250), rand(1630, 1930)]) {
+      if (Math.random() < .6) {
+        const cy2 = hy + pick([-1, 1]) * rand(34, 46), col = pick(CAR_COLORS);
+        drawCar(c, x, cy2, true, col);
+        obstacles.push({ type:'rect', x:x - 25, y:cy2 - 12, w:50, h:24 });
+      }
+    }
+  }
+  mapStart = { x: 760, y: 735 }; // incrocio centrale: spawn su strada, sempre libero
+}
+function drawRoof(c, r) {
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(r.x + 6, r.y + 6, r.w, r.h);
+  const tones = ['#575c63', '#5f5a52', '#565b52', '#5b5f66'];
+  c.fillStyle = pick(tones); c.fillRect(r.x, r.y, r.w, r.h);
+  c.strokeStyle = '#33373c'; c.lineWidth = 4; c.strokeRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+  c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 2; c.strokeRect(r.x + 8, r.y + 8, r.w - 16, r.h - 16);
+  // unità A/C e lucernari
+  for (let i = 0; i < randInt(2, 4); i++) {
+    const ax = rand(r.x + 18, r.x + r.w - 40), ay = rand(r.y + 18, r.y + r.h - 40);
+    c.fillStyle = '#6a7078'; c.fillRect(ax, ay, 22, 22);
+    c.strokeStyle = '#3a3e44'; c.lineWidth = 2; c.strokeRect(ax, ay, 22, 22);
+    c.fillStyle = '#4a4f56'; c.fillRect(ax + 5, ay + 5, 12, 12);
+  }
+  c.fillStyle = '#2c3034';
+  c.fillRect(r.x + r.w * .42, r.y + r.h * .38, 34, 26);
+}
+
+function buildCountry() {
+  obstacles = []; canopy = [];
+  const c = mapCtx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  // prato con chiazze
+  c.fillStyle = '#4d7a40'; c.fillRect(0, 0, WORLD.w, WORLD.h);
+  for (let i = 0; i < 90; i++) {
+    c.fillStyle = pick(['rgba(58,102,48,.5)', 'rgba(88,140,70,.5)', 'rgba(70,116,54,.5)']);
+    c.beginPath(); c.ellipse(rand(0, WORLD.w), rand(0, WORLD.h), rand(40, 130), rand(26, 80), rand(0, TAU), 0, TAU); c.fill();
+  }
+  // ciuffi d'erba e fiorellini
+  c.strokeStyle = 'rgba(34,66,28,.55)'; c.lineWidth = 2;
+  for (let i = 0; i < 420; i++) {
+    const x = rand(0, WORLD.w), y = rand(0, WORLD.h);
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x - 2, y - 6); c.moveTo(x, y); c.lineTo(x + 2, y - 5); c.stroke();
+  }
+  for (let i = 0; i < 90; i++) {
+    c.fillStyle = pick(['#e8e4c8', '#f2d05a', '#e2e9f0']);
+    c.beginPath(); c.arc(rand(0, WORLD.w), rand(0, WORLD.h), 1.8, 0, TAU); c.fill();
+  }
+  // strada sterrata centrale
+  c.fillStyle = '#8a6f4d';
+  c.beginPath();
+  c.moveTo(0, 745);
+  for (let x = 0; x <= WORLD.w; x += 60) c.lineTo(x, 745 + Math.sin(x * .01) * 14 + rand(-6, 6));
+  for (let x = WORLD.w; x >= 0; x -= 60) c.lineTo(x, 855 + Math.sin(x * .013) * 12 + rand(-6, 6));
+  c.closePath(); c.fill();
+  c.fillStyle = 'rgba(60,44,28,.4)';
+  for (let i = 0; i < 60; i++) { c.beginPath(); c.arc(rand(0, WORLD.w), rand(760, 840), rand(1, 3), 0, TAU); c.fill(); }
+  // fienile
+  const bx = 1650, by = 1080, bw = 175, bh = 135;
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(bx + 8, by + 8, bw, bh);
+  c.fillStyle = '#9c3f34'; c.fillRect(bx, by, bw, bh);
+  c.fillStyle = '#7e3129'; c.fillRect(bx, by + bh/2, bw, bh/2);                 // falda
+  c.strokeStyle = '#571f19'; c.lineWidth = 4; c.strokeRect(bx + 2, by + 2, bw - 4, bh - 4);
+  c.fillStyle = '#d8c9a8'; c.fillRect(bx + bw/2 - 22, by + bh - 4, 44, 10);    // porta
+  c.strokeStyle = '#571f19'; c.lineWidth = 2;
+  for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(bx + bw/2 + i*9, by + bh - 4); c.lineTo(bx + bw/2 + i*9, by + bh + 6); c.stroke(); }
+  obstacles.push({ type:'rect', x:bx, y:by, w:bw, h:bh });
+  // staccionate (segmenti con passaggi)
+  const fences = [
+    { x:250, y:330, len:300, horiz:true }, { x:640, y:330, len:180, horiz:true },
+    { x:1850, y:420, len:280, horiz:true },
+    { x:350, y:1180, len:240, horiz:true },
+    { x:1560, y:1120, len:180, horiz:true }, { x:1880, y:1300, len:220, horiz:true },
+    { x:1120, y:220, len:260, horiz:false }, { x:1120, y:1330, len:200, horiz:false },
+  ];
+  for (const f of fences) {
+    const fw = f.horiz ? f.len : 12, fh = f.horiz ? 12 : f.len;
+    c.fillStyle = 'rgba(0,0,0,.25)';
+    c.fillRect(f.x + 3, f.y + 4, fw, fh);
+    c.fillStyle = '#8a6440'; c.fillRect(f.x, f.y, fw, fh);                     // traverse
+    c.fillStyle = '#75542f';
+    if (f.horiz) { c.fillRect(f.x, f.y - 2, fw, 4); c.fillRect(f.x, f.y + 10, fw, 4); }
+    else         { c.fillRect(f.x - 2, f.y, 4, fh); c.fillRect(f.x + 10, f.y, 4, fh); }
+    c.fillStyle = '#5f421f';                                                   // paletti
+    const n = Math.floor(f.len / 28);
+    for (let i = 0; i <= n; i++) {
+      if (f.horiz) c.fillRect(f.x + i * 28 - 3, f.y - 5, 7, 22);
+      else         c.fillRect(f.x - 5, f.y + i * 28 - 3, 22, 7);
+    }
+    obstacles.push({ type:'rect', x:f.x, y:f.y, w:fw, h:fh });
+  }
+  // alberi: chioma prerenderizzata, tronco = hitbox circolare
+  let placed = 0, guard = 0;
+  while (placed < 17 && guard++ < 400) {
+    const x = rand(90, WORLD.w - 90), y = rand(90, WORLD.h - 90);
+    if (dist(x, y, 1120, 800) < 280) continue;
+    if (Math.abs(y - 800) < 110) continue;
+    if (x > 1560 && x < 1900 && y > 1000 && y < 1290) continue; // niente alberi sul fienile
+    let ok = true;
+    for (const o of obstacles) { // a build-time si usa l'array direttamente
+      if (o.type === 'rect') { if (circleRectOverlap(x, y, 40, o)) { ok = false; break; } }
+      else if (dist(x, y, o.x, o.y) < 40 + o.r + 20) { ok = false; break; }
+    }
+    if (!ok) continue;
+    obstacles.push({ type:'circle', x, y, r:24 });
+    const tr = rand(38, 50);
+    canopy.push({ x, y, r:tr, spr: bakeTree(tr, pick(['#3f6b3a', '#38632f', '#467440']), rand(0, 9)) });
+    placed++;
+  }
+  // massi decorativi (senza hitbox)
+  for (let i = 0; i < 10; i++) {
+    const x = rand(60, WORLD.w - 60), y = rand(60, WORLD.h - 60);
+    if (dist(x, y, 1120, 800) < 240) continue;
+    c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(x + 3, y + 3, 11, 8, 0, 0, TAU); c.fill();
+    c.fillStyle = '#8d9096'; c.beginPath(); c.ellipse(x, y, 11, 8, rand(0, TAU), 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.ellipse(x - 2, y - 2, 5, 3, 0, 0, TAU); c.fill();
+  }
+  mapStart = { x: 1120, y: 800 };
+}
+function buildMap(which) {
+  if (which === 'city') buildCity(); else buildCountry();
+  buildObstacleGrid(); // indice spaziale degli ostacoli per le collisioni
+  decalCtx.clearRect(0, 0, WORLD.w, WORLD.h);
+}
+
+/* ============================================================
+   ZOMBIE — spawn, inseguimento vettoriale, danno
+============================================================ */
+function spawnZombie(w, mode = 'hunt') {
+  // composizione dell'orda: runner dalla wave 2, brute dalla wave 4
+  let type = 'walker';
+  if (w >= 2 && Math.random() < Math.min(.1 + w * .03, .3)) type = 'runner';
+  if (w >= 4 && Math.random() < Math.min(.05 + w * .015, .18)) type = 'brute';
+  const T = ZTYPES[type];
+  const z = zombies.obtain();
+  z.mode = mode; z.type = type; z.r = T.r; z.spVariant = randInt(0, 2);
+  z.maxHp = z.hp = Math.round(T.hp * (1 + (w - 1) * .28) * diff.zHp);
+  z.dmg = T.dmg * (1 + (w - 1) * .06) * diff.zDmg;
+  z.spd = T.spd * (1 + Math.min(w * .02, .5)) * diff.zSpd * rand(.92, 1.08);
+  z.xp = T.xp;
+  z.flash = 0; z.pushX = 0; z.pushY = 0; z.ph = rand(0, TAU);
+  if (mode === 'hunt') {
+    // spawn sui bordi dell'area visibile, fuori schermo, dentro al mondo
+    const cx = cam.x + vw / 2, cy = cam.y + vh / 2;
+    const R = Math.hypot(vw, vh) / 2 + rand(70, 150);
+    for (let i = 0; i < 12; i++) {
+      const a = rand(0, TAU);
+      const x = clamp(cx + Math.cos(a) * R, 40, WORLD.w - 40);
+      const y = clamp(cy + Math.sin(a) * R, 40, WORLD.h - 40);
+      if (!pointBlocked(x, y, z.r + 4)) { z.x = x; z.y = y; break; }
+      z.x = x; z.y = y;
+    }
+    zAlive++;
+  } else {
+    for (let i = 0; i < 10; i++) {
+      z.x = rand(200, WORLD.w - 200); z.y = rand(200, WORLD.h - 200);
+      if (!pointBlocked(z.x, z.y, z.r + 4)) break;
+    }
+    z.wdir = rand(0, TAU); z.wtimer = rand(1, 3);
+    z.dmg = 0; z.spd = 40;
+  }
+  return z;
+}
+function killZombie(z) {
+  zombies.release(z); zAlive--; kills++;
+  shake(3 + z.r * .1); sfx.die();
+  // decal di sangue permanente sul layer dedicato
+  for (let i = 0; i < 3; i++) {
+    decalCtx.fillStyle = `rgba(${randInt(100, 140)}, 22, 16, ${rand(.35, .6)})`;
+    decalCtx.beginPath();
+    decalCtx.ellipse(z.x + rand(-14, 14), z.y + rand(-14, 14), rand(5, 14), rand(4, 10), rand(0, TAU), 0, TAU);
+    decalCtx.fill();
+  }
+  for (let i = 0; i < 10; i++) addParticle(z.x, z.y, rand(-90, 90), rand(-90, 90), rand(.3, .6), rand(2, 4), '#8f2418');
+  // drop: orbs XP + loot
+  const nOrbs = z.type === 'brute' ? randInt(3, 5) : randInt(1, 3);
+  for (let i = 0; i < nOrbs; i++) {
+    const v = Math.max(1, Math.round((z.xp / nOrbs + rand(0, 1)) * diff.xp));
+    orbs.push({ x:z.x + rand(-14, 14), y:z.y + rand(-14, 14), v, pull:0, t:rand(0, TAU) });
+  }
+  if (Math.random() < .72) {
+    const v = Math.max(1, Math.round(rand(1, 3) * (1 + wave * .1) * diff.loot));
+    loots.push({ x:z.x + rand(-10, 10), y:z.y + rand(-10, 10), v, t:rand(0, TAU), rot:rand(0, TAU) });
+  }
+  // anti-overflow: fonde le orbs più vecchie
+  while (orbs.length > 150) { const o = orbs.shift(); orbs[0].v += o.v; }
+  while (loots.length > 80) { const o = loots.shift(); loots[0].v += o.v; }
+}
+
+/* ============================================================
+   COMBATTIMENTO — sparo, proiettili, danni
+============================================================ */
+function shoot() {
+  const n = player.multishot, spread = .13;
+  for (let i = 0; i < n; i++) {
+    const a = player.aim + (i - (n - 1) / 2) * spread;
+    const b = bullets.obtain();
+    b.x = player.x + Math.cos(a) * 26; b.y = player.y + Math.sin(a) * 26;
+    b.vx = Math.cos(a) * player.bulletSpeed; b.vy = Math.sin(a) * player.bulletSpeed;
+    b.dmg = player.damage; b.pierce = player.pierce; b.life = 1.5;
+    b.crit = Math.random() < player.crit;
+    b.hits.length = 0;
+  }
+  player.muzzle = .06; player.fireCd = 1 / player.fireRate;
+  sfx.shoot(); shake(1.2);
+}
+function hitZombie(z, b) {
+  const dmg = b.dmg * (b.crit ? 2.5 : 1);
+  z.hp -= dmg; z.flash = .09;
+  z.pushX += b.vx * .06; z.pushY += b.vy * .06; // knockback
+  for (let i = 0; i < 4; i++) addParticle(b.x, b.y, rand(-70, 70), rand(-70, 70), rand(.2, .4), rand(1.5, 3), '#8f2418');
+  if (b.crit) addParticle(z.x, z.y - z.r, 0, -46, .7, 0, '#ffb020', 'CRIT!');
+  sfx.hit();
+  if (z.hp <= 0) killZombie(z);
+}
+function hitPlayer(z) {
+  const dmg = z.dmg * (1 - player.armor);
+  player.hp -= dmg; player.invuln = .75; dmgFlash = .6;
+  const d = Math.max(1, dist(z.x, z.y, player.x, player.y));
+  player.x += (player.x - z.x) / d * 10; player.y += (player.y - z.y) / d * 10;
+  shake(8); sfx.hurt();
+  for (let i = 0; i < 6; i++) addParticle(player.x, player.y, rand(-80, 80), rand(-80, 80), rand(.2, .5), 3, '#c22c1c');
+}
+
+/* ============================================================
+   UPDATE — logica per frame (chiamata solo in state 'playing')
+============================================================ */
+function updatePlayer(dt) {
+  let mx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0), my = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+  const l = Math.hypot(mx, my);
+  player.moving = l > 0;
+  if (player.moving) {
+    mx /= l; my /= l;
+    player.moveAngle = Math.atan2(my, mx);
+    player.walkT += dt * 9;
+    player.x += mx * player.speed * dt; player.y += my * player.speed * dt;
+  }
+  player.x = clamp(player.x, player.r, WORLD.w - player.r);
+  player.y = clamp(player.y, player.r, WORLD.h - player.r);
+  collideObstacles(player);
+  player.aim = Math.atan2(mouse.y + cam.y - player.y, mouse.x + cam.x - player.x);
+  player.invuln -= dt; player.muzzle -= dt; player.fireCd -= dt;
+  if (mouse.down && player.fireCd <= 0) shoot();
+  if (player.regen > 0) player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
+  if (player.hp <= 0) doGameOver();
+}
+function updateBullets(dt) {
+  for (const b of bullets.items) {
+    if (!b.active) continue;
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    if (b.life <= 0 || b.x < 0 || b.y < 0 || b.x > WORLD.w || b.y > WORLD.h) { bullets.release(b); continue; }
+    if (bulletBlocked(b)) { // muri, auto e alberi fermano i proiettili
+      for (let i = 0; i < 4; i++) addParticle(b.x, b.y, rand(-60, 60), rand(-60, 60), .18, 2, '#d8cfa8');
+      bullets.release(b); continue;
+    }
+    // hit-test solo contro gli zombie nelle celle vicine (spatial hash)
+    let spent = false;
+    zGridNear(b.x, b.y, z => {
+      if (!z.active || z.mode !== 'hunt' || b.hits.includes(z)) return;
+      const dx = z.x - b.x, dy = z.y - b.y, rr = z.r + b.r;
+      if (dx * dx + dy * dy < rr * rr) {
+        hitZombie(z, b);
+        b.hits.push(z);
+        if (b.pierce > 0) b.pierce--;
+        else { spent = true; return true; } // interrompe la scansione
+      }
+    });
+    if (spent) bullets.release(b);
+  }
+}
+function updateZombies(dt) {
+  for (const z of zombies.items) {
+    if (!z.active) continue;
+    z.flash -= dt; z.ph += dt;
+    if (z.mode === 'wander') {
+      z.wtimer -= dt;
+      if (z.wtimer <= 0) { z.wdir = rand(0, TAU); z.wtimer = rand(1.5, 3.5); }
+      z.ang = z.wdir;
+      z.x += Math.cos(z.wdir) * z.spd * dt; z.y += Math.sin(z.wdir) * z.spd * dt;
+      if (z.x < 60 || z.x > WORLD.w - 60) z.wdir = Math.PI - z.wdir;
+      if (z.y < 60 || z.y > WORLD.h - 60) z.wdir = -z.wdir;
+    } else {
+      // inseguimento vettoriale diretto: direzione normalizzata verso il player
+      const dx = player.x - z.x, dy = player.y - z.y, d = Math.max(1, Math.hypot(dx, dy));
+      z.ang = Math.atan2(dy, dx);
+      z.x += (dx / d) * z.spd * dt + z.pushX * dt;
+      z.y += (dy / d) * z.spd * dt + z.pushY * dt;
+      if (d < z.r + player.r + 1 && player.invuln <= 0) hitPlayer(z);
+    }
+    z.pushX *= Math.exp(-7 * dt); z.pushY *= Math.exp(-7 * dt);
+  }
+  separateZombies();
+  for (const z of zombies.items) if (z.active) collideObstacles(z);
+}
+// separazione morbida tra zombie via spatial hash: ogni coppia valutata una sola volta
+function separateZombies() {
+  for (const a of zombies.items) {
+    if (!a.active) continue;
+    zGridNear(a.x, a.y, b => {
+      if (b === a || !b.active || b._seq < a._seq) return;
+      const dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < min * min && d2 > .01) {
+        const d = Math.sqrt(d2), push = (min - d) / d * .5;
+        a.x -= dx * push; a.y -= dy * push;
+        b.x += dx * push; b.y += dy * push;
+      }
+    });
+  }
+}
+function updatePickups(dt) {
+  // orbs XP: attrazione magnetica con accelerazione
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i]; o.t += dt * 4;
+    const d = dist(o.x, o.y, player.x, player.y);
+    if (d < player.pickupRange) {
+      o.pull = Math.min(o.pull + 1500 * dt, 820);
+      o.x += (player.x - o.x) / d * o.pull * dt;
+      o.y += (player.y - o.y) / d * o.pull * dt;
+    }
+    if (d < player.r + 7) {
+      orbs.splice(i, 1);
+      player.xp += o.v; sfx.pickup();
+      addParticle(player.x, player.y - 22, 0, -40, .55, 0, '#9d6bff', '+' + o.v);
+    }
+  }
+  for (let i = loots.length - 1; i >= 0; i--) {
+    const o = loots[i]; o.t += dt * 4; o.rot += dt * 2;
+    const d = dist(o.x, o.y, player.x, player.y);
+    if (d < player.pickupRange) {
+      o.x += (player.x - o.x) / Math.max(1, d) * 420 * dt;
+      o.y += (player.y - o.y) / Math.max(1, d) * 420 * dt;
+    }
+    if (d < player.r + 9) {
+      loots.splice(i, 1);
+      player.loot += o.v; sfx.coin();
+      addParticle(player.x, player.y - 22, 0, -44, .6, 0, '#f2b632', '+' + o.v);
+    }
+  }
+}
+function updateParticles(dt) {
+  for (const p of particles.items) {
+    if (!p.active) continue;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= Math.exp(-3 * dt); p.vy *= Math.exp(-3 * dt);
+    p.life -= dt;
+    if (p.life <= 0) particles.release(p);
+  }
+}
+function updateCamera(dt) {
+  // la camera segue il player con un leggero lead verso il mirino
+  const leadX = clamp((mouse.x - vw / 2) * .18, -110, 110);
+  const leadY = clamp((mouse.y - vh / 2) * .18, -110, 110);
+  const tx = player.x + leadX - vw / 2, ty = player.y + leadY - vh / 2;
+  const k = Math.min(1, dt * 6);
+  cam.x = lerp(cam.x, tx, k); cam.y = lerp(cam.y, ty, k);
+  cam.x = vw >= WORLD.w ? (WORLD.w - vw) / 2 : clamp(cam.x, 0, WORLD.w - vw);
+  cam.y = vh >= WORLD.h ? (WORLD.h - vh) / 2 : clamp(cam.y, 0, WORLD.h - vh);
+}
+function updateWave(dt) {
+  if (nextWaveDelay > 0) {
+    nextWaveDelay -= dt;
+    if (nextWaveDelay <= 0) startWave(wave + 1);
+    return;
+  }
+  if (!waveActive) return;
+  spawnTimer -= dt;
+  if (spawnTimer <= 0 && waveSpawned < waveTotal && zAlive < ALIVE_CAP) {
+    const grp = Math.min(groupSize, waveTotal - waveSpawned, ALIVE_CAP - zAlive);
+    for (let i = 0; i < grp; i++) { spawnZombie(wave); waveSpawned++; }
+    spawnTimer = spawnInterval;
+  }
+  // fine ondata: tutti gli zombie della wave sono stati sconfitti
+  if (waveSpawned >= waveTotal && zAlive === 0) {
+    waveActive = false;
+    openUpgrade('wave');
+  }
+}
+function update(dt) {
+  time += dt; runTime += dt;
+  zGridRebuild(); // spatial hash aggiornata ogni frame
+  updateWave(dt);
+  if (state !== 'playing') return; // ondata completata -> modal upgrade
+  updatePlayer(dt);
+  if (state !== 'playing') return; // il player può morire durante l'update
+  updateBullets(dt);
+  updateZombies(dt);
+  updatePickups(dt);
+  updateParticles(dt);
+  updateCamera(dt);
+  // level up (UNA schermata per volta: livelli extra rientrano al resume)
+  if (player.xp >= player.xpNext) {
+    player.level++; player.xp -= player.xpNext; player.xpNext = xpForLevel(player.level);
+    sfx.level();
+    for (let i = 0; i < 14; i++) addParticle(player.x, player.y, rand(-120, 120), rand(-120, 120), .6, 3, '#9d6bff');
+    openUpgrade('level');
+    return;
+  }
+  updateHUD();
+}
+
+/* ============================================================
+   ONDATE & DIFFICOLTÀ
+============================================================ */
+function startWave(n) {
+  wave = n;
+  waveTotal = Math.max(4, Math.round((5 + n * 3 + n * n * .22) * diff.density));
+  waveSpawned = 0; waveActive = true;
+  spawnInterval = Math.max(.7, 2.2 - n * .12);
+  groupSize = Math.min(3 + Math.floor(n / 2), 8);
+  spawnTimer = 1.5;
+  showBanner('ONDATA ' + n, waveTotal + ' zombie in arrivo');
+  sfx.wave();
+  updateHUD();
+}
+function doGameOver() {
+  state = 'dead';
+  document.body.classList.remove('playing');
+  for (let i = 0; i < 24; i++) addParticle(player.x, player.y, rand(-160, 160), rand(-160, 160), rand(.4, .9), 4, '#c22c1c');
+  for (let i = 0; i < 4; i++) {
+    decalCtx.fillStyle = 'rgba(120,20,14,.5)';
+    decalCtx.beginPath(); decalCtx.ellipse(player.x + rand(-20, 20), player.y + rand(-20, 20), rand(10, 20), rand(8, 14), rand(0, TAU), 0, TAU); decalCtx.fill();
+  }
+  document.getElementById('goWave').textContent = Math.max(1, wave);
+  document.getElementById('goLevel').textContent = player.level;
+  document.getElementById('goKills').textContent = kills;
+  document.getElementById('goLoot').textContent = player.loot;
+  const m = Math.floor(runTime / 60), s = Math.floor(runTime % 60);
+  document.getElementById('goTime').textContent = m + ':' + String(s).padStart(2, '0');
+  show('gameover'); hide('hud');
+}
+
+/* ============================================================
+   SISTEMA UPGRADE — pool, rarità, RNG pesato con scaling difficoltà
+============================================================ */
+const RAR = [
+  { n:'COMUNE',     c:'var(--r0)' }, { n:'RARO',  c:'var(--r1)' },
+  { n:'EPICO',      c:'var(--r2)' }, { n:'LEGGENDARIO', c:'var(--r3)' },
+];
+const RAR_BASE_W = [100, 46, 17, 5]; // pesi base: comune > raro > epico > leggendario
+
+const UPGRADES = [
+  { id:'rof1',  r:0, icon:'i-rof',    name:'Dita Svelte',          desc:'+15% rateo di fuoco',                              apply:p => p.fireRate *= 1.15 },
+  { id:'dmg1',  r:0, icon:'i-dmg',    name:'Piombo Pesante',       desc:'+20% danno per proiettile',                          apply:p => p.damage *= 1.2 },
+  { id:'spd1',  r:0, icon:'i-spd',    name:'Passo Svelto',         desc:'+12% velocità di movimento',                        apply:p => p.speed *= 1.12 },
+  { id:'mag1',  r:0, icon:'i-magnet',name:'Tasche Grosse',        desc:'+45% raggio di raccolta di loot e orbs',            apply:p => p.pickupRange *= 1.45 },
+  { id:'bul1',  r:0, icon:'i-bullet', name:'Polvere Fine',         desc:'+30% velocità dei proiettili',                      apply:p => p.bulletSpeed *= 1.3 },
+  { id:'rof2',  r:1, icon:'i-rof',    name:'Grilletto Furioso',    desc:'+25% rateo di fuoco',                              apply:p => p.fireRate *= 1.25 },
+  { id:'dmg2',  r:1, icon:'i-dmg',    name:'Cartucce a Palla',     desc:'+35% danno per proiettile',                         apply:p => p.damage *= 1.35 },
+  { id:'pie1',  r:1, icon:'i-pierce', name:'Punta Perforante',     desc:'I proiettili attraversano +1 nemico',               apply:p => p.pierce += 1 },
+  { id:'hp1',   r:1, icon:'i-hp',     name:'Sangue Nuovo',         desc:'+25 HP massimi e cura 25 HP',                       apply:p => { p.maxHp += 25; p.hp = Math.min(p.maxHp, p.hp + 25); } },
+  { id:'spd2',  r:1, icon:'i-spd',    name:'Falcata Lunga',        desc:'+20% velocità di movimento',                        apply:p => p.speed *= 1.2 },
+  { id:'mult',  r:2, icon:'i-multi',  name:'Doppia Canne',        desc:'+1 proiettile per colpo',                           apply:p => p.multishot += 1 },
+  { id:'regn',  r:2, icon:'i-regen',  name:'Costituzione di Ferro',desc:'+1.5 HP rigenerati al secondo',                     apply:p => p.regen += 1.5 },
+  { id:'crit',  r:2, icon:'i-crit',   name:"Colpo all'Occipite",  desc:'+12% probabilità di critico (danno x2.5)',          apply:p => p.crit = Math.min(.8, p.crit + .12) },
+  { id:'armr',  r:2, icon:'i-armor',  name:'Coppola Rinforzata',  desc:'−15% danni subiti (cumulabile fino a −60%)',        apply:p => p.armor = Math.min(.6, p.armor + .15) },
+  { id:'mult3', r:3, icon:'i-multi',  name:'Trio di Lupare',       desc:'+2 proiettili per colpo',                           apply:p => p.multishot += 2 },
+  { id:'hpbig', r:3, icon:'i-hp',     name:'Cuore di Peppe',       desc:'+60 HP massimi, cura completa, +1 rigenerazione',   apply:p => { p.maxHp += 60; p.hp = p.maxHp; p.regen += 1; } },
+  { id:'pieb',  r:3, icon:'i-pierce', name:'Palla di Cannone',     desc:'+2 perforanti e +25% danno',                        apply:p => { p.pierce += 2; p.damage *= 1.25; } },
+  { id:'magb',  r:3, icon:'i-magnet', name:'Aspirapolvere',        desc:'Raggio di raccolta x2.5',                           apply:p => p.pickupRange *= 2.5 },
+];
+
+// REWARD SCALING: nelle difficoltà alte i pesi di Epico/Leggendario
+// vengono moltiplicati dal fattore `rarity` della difficoltà scelta
+function rarWeight(r) {
+  const m = diff.rarity;
+  if (r === 0) return RAR_BASE_W[0];
+  if (r === 1) return RAR_BASE_W[1] * (1 + (m - 1) * .35);
+  if (r === 2) return RAR_BASE_W[2] * m;
+  return RAR_BASE_W[3] * m;
+}
+function rollUpgrades() {
+  const avail = UPGRADES.slice(), out = [];
+  while (out.length < 3 && avail.length) {
+    let tot = 0;
+    for (const u of avail) tot += rarWeight(u.r);
+    let roll = Math.random() * tot, chosen = avail[avail.length - 1];
+    for (const u of avail) { roll -= rarWeight(u.r); if (roll <= 0) { chosen = u; break; } }
+    avail.splice(avail.indexOf(chosen), 1); // campionamento senza rimpiazzo
+    out.push(chosen);
+  }
+  return out;
+}
+function chooseUpgrade(i) {
+  if (!upgradeOpen || !currentOffers[i]) return;
+  upgradeOpen = false;
+  currentOffers[i].apply(player);
+  hide('upgradeModal');
+  state = 'playing';
+  document.body.classList.add('playing');
+  if (waveActive === false && waveSpawned >= waveTotal && wave > 0) nextWaveDelay = 2;
+  updateHUD();
+}
+
+/* ============================================================
+   UI LOGIC — scene, HUD (aggiornato solo se i valori cambiano),
+   banner, menu. Il DOM viene toccato il meno possibile: niente
+   layout thrash a ogni frame.
+============================================================ */
+const $ = id => document.getElementById(id);
+const show = id => $(id).classList.remove('hidden');
+const hide = id => $(id).classList.add('hidden');
+
+// cache degli elementi HUD usati a ogni frame
+const ui = {
+  hpFill: $('hpFill'), hpText: $('hpText'), xpFill: $('xpFill'), lvlText: $('lvlText'),
+  waveText: $('waveText'), lootText: $('lootText'), fps: $('fpsText'), vignette: $('vignette'),
+};
+const hudPrev = {}; // dirty-check: aggiorno il DOM solo quando il valore cambia davvero
+let vigLast = -1;
+
+function updateHUD() {
+  const hpPct = Math.round(clamp(player.hp / player.maxHp, 0, 1) * 1000) / 10;
+  if (hudPrev.hpW !== hpPct) { hudPrev.hpW = hpPct; ui.hpFill.style.width = hpPct + '%'; }
+  const hpTxt = Math.max(0, Math.ceil(player.hp)) + '/' + player.maxHp;
+  if (hudPrev.hpT !== hpTxt) { hudPrev.hpT = hpTxt; ui.hpText.textContent = hpTxt; }
+  const xpPct = Math.round(clamp(player.xp / player.xpNext, 0, 1) * 1000) / 10;
+  if (hudPrev.xpW !== xpPct) { hudPrev.xpW = xpPct; ui.xpFill.style.width = xpPct + '%'; }
+  const lvl = 'LIVELLO ' + player.level;
+  if (hudPrev.lvl !== lvl) { hudPrev.lvl = lvl; ui.lvlText.textContent = lvl; }
+  const wv = wave > 0 ? 'ONDATA ' + wave : 'IN ARRIVO';
+  if (hudPrev.wv !== wv) { hudPrev.wv = wv; ui.waveText.textContent = wv; }
+  if (hudPrev.loot !== player.loot) { hudPrev.loot = player.loot; ui.lootText.textContent = player.loot; }
+}
+function showBanner(big, sub) {
+  const bn = $('waveBanner');
+  bn.querySelector('.wb-big').textContent = big;
+  bn.querySelector('.wb-sub').textContent = sub;
+  bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
+}
+function openUpgrade(reason) {
+  state = 'upgrade';
+  document.body.classList.remove('playing');
+  currentOffers = rollUpgrades();
+  upgradeOpen = true;
+  $('upTitle').textContent = reason === 'level'
+    ? 'LIVELLO ' + player.level + '!' : 'ONDATA ' + wave + ' COMPLETATA';
+  $('upReason').textContent = reason === 'level'
+    ? 'ZioPeppe è diventato ancora più pericoloso.' : 'Il quartiere tira un sospiro… breve.';
+  $('upStats').textContent =
+    `HP ${Math.ceil(player.hp)}/${player.maxHp} · Danno ${Math.round(player.damage)} · Rateo ${player.fireRate.toFixed(1)}/s · Vel ${Math.round(player.speed)}`;
+  const cards = $('cards'); cards.innerHTML = '';
+  const rots = ['-1.4deg', '0.6deg', '-0.5deg'];
+  currentOffers.forEach((u, i) => {
+    const cardEl = document.createElement('button');
+    cardEl.className = 'card';
+    cardEl.style.setProperty('--rc', RAR[u.r].c);
+    cardEl.style.setProperty('--rot', rots[i % 3]);
+    cardEl.style.setProperty('--d', (i * .09) + 's');
+    cardEl.innerHTML =
+      `<span class="key">${i+1}</span><div class="rar">${RAR[u.r].n}</div>` +
+      `<div class="c-icon"><svg><use href="#${u.icon}"/></svg></div>` +
+      `<h3>${u.name}</h3><p>${u.desc}</p>`;
+    cardEl.addEventListener('click', () => chooseUpgrade(i));
+    cards.appendChild(cardEl);
+  });
+  show('upgradeModal');
+}
+function togglePause() {
+  if (state === 'playing') { state = 'paused'; document.body.classList.remove('playing'); show('pauseOverlay'); }
+  else if (state === 'paused') { state = 'playing'; document.body.classList.add('playing'); hide('pauseOverlay'); }
+}
+
+/* ---------- Menu: selettori, anteprime e ritratto animato ---------- */
+function setDiff(d) {
+  selectedDiff = d; diff = DIFFS[d];
+  $('diffDesc').textContent = diff.desc;
+  for (const b of $('diffSeg').children) b.classList.toggle('active', b.dataset.d === d);
+}
+ $('diffSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setDiff(b.dataset.d); });
+ $('mapCity').addEventListener('click', () => selectMap('city'));
+ $('mapCountry').addEventListener('click', () => selectMap('country'));
+function selectMap(m) {
+  selectedMap = m;
+  $('mapCity').classList.toggle('active', m === 'city');
+  $('mapCountry').classList.toggle('active', m === 'country');
+  rigeneraSfondoMenu();
+}
+ $('playBtn').addEventListener('click', startGame);
+ $('goMenuBtn').addEventListener('click', goToMenu);
+
+function drawMiniPreview(cvs, kind) {
+  const c = cvs.getContext('2d'), W = cvs.width, H = cvs.height;
+  if (kind === 'city') {
+    c.fillStyle = '#33363b'; c.fillRect(0, 0, W, H);
+    c.strokeStyle = '#c9a23f'; c.setLineDash([6, 5]); c.lineWidth = 2;
+    c.beginPath(); c.moveTo(0, H/2); c.lineTo(W, H/2); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#767a80'; c.fillRect(14, 10, 54, 34); c.fillRect(88, 58, 62, 36);
+    c.strokeStyle = '#94989e'; c.strokeRect(14, 10, 54, 34); c.strokeRect(88, 58, 62, 36);
+    c.fillStyle = '#575c63'; c.fillRect(20, 15, 42, 24); c.fillRect(94, 63, 50, 26);
+    c.strokeStyle = '#33373c'; c.lineWidth = 3; c.strokeRect(20, 15, 42, 24); c.strokeRect(94, 63, 50, 26);
+    drawCar(c, 40, 78, true, '#b5533c'); drawCar(c, 120, 30, false, '#6e8f8a');
+  } else {
+    c.fillStyle = '#4d7a40'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(58,102,48,.6)';
+    for (let i = 0; i < 8; i++) { c.beginPath(); c.ellipse(rand(0, W), rand(0, H), rand(10, 26), rand(8, 16), 0, 0, TAU); c.fill(); }
+    c.fillStyle = '#8a6440'; c.fillRect(0, 60, W, 8);
+    c.fillStyle = '#75542f'; for (let x = 4; x < W; x += 16) c.fillRect(x, 56, 5, 16);
+    c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.arc(44, 34, 17, 0, TAU); c.fill();
+    c.fillStyle = '#3f6b3a'; c.beginPath(); c.arc(40, 30, 17, 0, TAU); c.fill();
+    c.fillStyle = '#527f47'; c.beginPath(); c.arc(35, 25, 8, 0, TAU); c.fill();
+    c.fillStyle = '#9c3f34'; c.fillRect(104, 16, 42, 30);
+    c.strokeStyle = '#571f19'; c.lineWidth = 3; c.strokeRect(105, 17, 40, 28);
+  }
+}
+
+/* ============================================================
+   DISEGNO ENTITÀ — sprite prerenderizzati per zombie e alberi,
+   disegno vettoriale solo per il player (un'istanza sola)
+============================================================ */
+// corpo+testa degli zombie cotti una volta per tipo (3 varianti ciascuno):
+// a runtime restano solo 4 path (gambe/braccia animate) + 1 drawImage
+const zombieSprites = { walker:[], runner:[], brute:[] };
+function bakeZombieSprites() {
+  for (const type in ZTYPES) {
+    const T = ZTYPES[type], r = T.r;
+    const S = Math.ceil(r * 2) + 6;
+    for (let v = 0; v < 3; v++) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = S;
+      const c = cv.getContext('2d');
+      c.translate(S / 2, S / 2);
+      // corpo con macchie
+      c.fillStyle = T.col;
+      c.beginPath(); c.ellipse(0, 0, r * .88, r * .72, 0, 0, TAU); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.stroke();
+      c.fillStyle = 'rgba(40,54,26,.55)';
+      for (let i = 0; i < 3; i++) {
+        c.beginPath();
+        c.ellipse(rand(-.45, .45) * r, rand(-.4, .4) * r, rand(.15, .3) * r, rand(.1, .22) * r, rand(0, TAU), 0, TAU);
+        c.fill();
+      }
+      // testa
+      c.fillStyle = T.skin;
+      c.beginPath(); c.arc(r * .14, 0, r * .5, 0, TAU); c.fill();
+      c.fillStyle = '#232818';
+      const er = Math.max(1.6, r * .09);
+      c.beginPath(); c.arc(r * .38, -r * .18, er, 0, TAU); c.fill();
+      c.beginPath(); c.arc(r * .38, r * .18, er, 0, TAU); c.fill();
+      // capelli radi solo su una variante
+      if (v === 2) {
+        c.fillStyle = '#2c2c22';
+        c.beginPath(); c.arc(r * .05, -r * .3, r * .2, 0, TAU); c.fill();
+        c.beginPath(); c.arc(r * .05, r * .3, r * .2, 0, TAU); c.fill();
+      }
+      zombieSprites[type].push(cv);
+    }
+  }
+}
+function drawZioPeppe(c, x, y, aim, opts) {
+  const s = (opts && opts.scale) || 1;
+  const walkT = (opts && opts.walkT) || 0;
+  const moving = (opts && opts.moving) || false;
+  const step = moving ? Math.sin(walkT) : 0;
+  // ombra a terra
+  c.fillStyle = 'rgba(0,0,0,.32)';
+  c.beginPath(); c.ellipse(x, y + 4 * s, 15 * s, 8 * s, 0, 0, TAU); c.fill();
+  // gambe (orientate al movimento, passo alternato)
+  const mv = (opts && opts.moveAngle != null) ? opts.moveAngle : aim;
+  c.save(); c.translate(x, y); c.rotate(mv);
+  c.fillStyle = '#2e2620';
+  c.beginPath(); c.ellipse(step * 4 * s, -6 * s, 5 * s, 4 * s, 0, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(-step * 4 * s, 6 * s, 5 * s, 4 * s, 0, 0, TAU); c.fill();
+  c.restore();
+  // busto, braccia, arma, testa e coppola (orientati alla mira)
+  c.save(); c.translate(x, y); c.rotate(aim);
+  // fucile a canna mozza
+  c.fillStyle = '#5a3d24'; c.fillRect(6 * s, -3 * s, 10 * s, 6 * s);
+  c.fillStyle = '#23262a'; c.fillRect(14 * s, -2.5 * s, 20 * s, 5 * s);
+  c.fillStyle = '#3a3e44'; c.fillRect(30 * s, -2 * s, 5 * s, 4 * s);
+  // spalle (giacca)
+  c.fillStyle = '#6b4a2f';
+  c.beginPath(); c.ellipse(0, 0, 13 * s, 11 * s, 0, 0, TAU); c.fill();
+  c.strokeStyle = '#4a3220'; c.lineWidth = 2 * s; c.stroke();
+  // braccia e mani
+  c.fillStyle = '#e8b98a';
+  c.beginPath(); c.arc(13 * s, -7 * s, 3.6 * s, 0, TAU); c.fill();
+  c.beginPath(); c.arc(15 * s, 6 * s, 3.6 * s, 0, TAU); c.fill();
+  c.strokeStyle = '#b5825a'; c.lineWidth = 1.5 * s;
+  c.beginPath(); c.arc(13 * s, -7 * s, 3.6 * s, 0, TAU); c.stroke();
+  c.beginPath(); c.arc(15 * s, 6 * s, 3.6 * s, 0, TAU); c.stroke();
+  // testa + basette
+  c.fillStyle = '#e8b98a';
+  c.beginPath(); c.arc(1 * s, 0, 7.5 * s, 0, TAU); c.fill();
+  c.fillStyle = '#4a3a28';
+  c.beginPath(); c.arc(0, -6.4 * s, 2 * s, 0, TAU); c.fill();
+  c.beginPath(); c.arc(0, 6.4 * s, 2 * s, 0, TAU); c.fill();
+  // LA COPPOLA di ZioPeppe (ben visibile) con visiera davanti
+  c.fillStyle = '#3c5a44';
+  c.beginPath(); c.arc(2 * s, 0, 8.6 * s, 0, TAU); c.fill();
+  c.strokeStyle = '#263c2e'; c.lineWidth = 2 * s; c.stroke();
+  c.fillStyle = '#46684e';
+  c.beginPath(); c.arc(1.4 * s, -1 * s, 6.2 * s, 0, TAU); c.fill();
+  c.fillStyle = '#2a4233';
+  rrect(c, 8.5 * s, -5.5 * s, 5.5 * s, 11 * s, 2.5 * s); c.fill();
+  c.restore();
+  // flash di volata
+  if (opts && opts.muzzle > 0) {
+    const mx = x + Math.cos(aim) * 38 * s, my = y + Math.sin(aim) * 38 * s;
+    c.fillStyle = 'rgba(255,214,110,' + Math.min(1, opts.muzzle * 14) + ')';
+    c.beginPath(); c.arc(mx, my, 7 * s, 0, TAU); c.fill();
+  }
+}
+function drawZombie(c, z) {
+  const r = z.r, wob = Math.sin(z.ph * 6) * .14;
+  c.fillStyle = 'rgba(0,0,0,.3)';
+  c.beginPath(); c.ellipse(z.x, z.y + 3, r * 1.05, r * .6, 0, 0, TAU); c.fill();
+  c.save(); c.translate(z.x, z.y); c.rotate(z.ang);
+  // gambe che strascicano
+  const st = Math.sin(z.ph * 5);
+  c.fillStyle = '#39402c';
+  c.beginPath(); c.ellipse(st * 4, -r * .42, r * .3, r * .24, 0, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(-st * 4, r * .42, r * .3, r * .24, 0, 0, TAU); c.fill();
+  // braccia protese in avanti (il classico zombie)
+  c.fillStyle = ZTYPES[z.type].skin;
+  const armX = r * .85 + Math.sin(z.ph * 6) * 3;
+  c.beginPath(); c.arc(armX, -r * .5 + wob * 6, r * .26, 0, TAU); c.fill();
+  c.beginPath(); c.arc(armX * .92, r * .5 - wob * 6, r * .26, 0, TAU); c.fill();
+  // corpo + testa prerenderizzati
+  const spr = zombieSprites[z.type][z.spVariant];
+  c.drawImage(spr, -spr.width / 2, -spr.height / 2);
+  c.restore();
+  // barra vita (solo se ferito)
+  if (z.hp < z.maxHp) {
+    c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(z.x - r, z.y - r - 9, r * 2, 4);
+    c.fillStyle = '#8f2418'; c.fillRect(z.x - r + 1, z.y - r - 8, (r * 2 - 2) * clamp(z.hp / z.maxHp, 0, 1), 2);
+  }
+  // flash bianco quando colpito
+  if (z.flash > 0) {
+    c.fillStyle = 'rgba(255,255,255,' + Math.min(.75, z.flash * 9) + ')';
+    c.beginPath(); c.arc(z.x, z.y, r * 1.05, 0, TAU); c.fill();
+  }
+}
+function drawCanopyTree(c, t) {
+  if (!inView(t.x, t.y, t.r + 20)) return;
+  c.drawImage(t.spr, t.x - t.spr.width / 2, t.y - t.spr.height / 2);
+}
+function drawLoot(c, o) {
+  c.save(); c.translate(o.x, o.y + Math.sin(o.t) * 2);
+  c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(0, 5, 7, 3, 0, 0, TAU); c.fill();
+  c.rotate(o.rot);
+  c.fillStyle = '#e9b53c';
+  for (let i = 0; i < 6; i++) { c.save(); c.rotate(i * TAU / 6); c.fillRect(-1.8, -8.5, 3.6, 4); c.restore(); }
+  c.beginPath(); c.arc(0, 0, 5.5, 0, TAU); c.fill();
+  c.strokeStyle = '#8a5f10'; c.lineWidth = 1.5; c.stroke();
+  c.fillStyle = '#8a5f10'; c.beginPath(); c.arc(0, 0, 2, 0, TAU); c.fill();
+  c.restore();
+}
+function drawOrb(c, o) {
+  const p = 1 + Math.sin(o.t * 1.4) * .18;
+  c.fillStyle = '#7b52e0';
+  c.beginPath(); c.arc(o.x, o.y, 6 * p, 0, TAU); c.fill();
+  c.strokeStyle = '#c9b2ff'; c.lineWidth = 1.5; c.stroke();
+  c.fillStyle = '#e6dcff';
+  c.beginPath(); c.arc(o.x - 1.5, o.y - 1.5, 1.6, 0, TAU); c.fill();
+}
+function drawCrosshair() {
+  const r = 9 + Math.max(0, player.fireCd) * 26;
+  ctx.strokeStyle = '#f2b632'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(mouse.x, mouse.y, r, 0, TAU); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(mouse.x - r - 6, mouse.y); ctx.lineTo(mouse.x - r + 2, mouse.y);
+  ctx.moveTo(mouse.x + r - 2, mouse.y); ctx.lineTo(mouse.x + r + 6, mouse.y);
+  ctx.moveTo(mouse.x, mouse.y - r - 6); ctx.lineTo(mouse.x, mouse.y - r + 2);
+  ctx.moveTo(mouse.x, mouse.y + r - 2); ctx.lineTo(mouse.x, mouse.y + r + 6);
+  ctx.stroke();
+  ctx.fillStyle = '#f2b632';
+  ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 1.8, 0, TAU); ctx.fill();
+}
+
+/* ============================================================
+   RENDER — mappa e decals blittati SOLO nella porzione visibile
+   (drawImage a 9 argomenti), culling di tutte le entità fuori vista
+============================================================ */
+function render() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#0b0c0e'; ctx.fillRect(0, 0, vw, vh);
+  let sx = 0, sy = 0;
+  if (shakePow > .1) { sx = rand(-shakePow, shakePow); sy = rand(-shakePow, shakePow); }
+  const vx = cam.x - sx, vy = cam.y - sy;
+  // rettangolo di vista in coordinate mondo (margine 90px per ombre/chiome)
+  view.l = vx - 90; view.t = vy - 90; view.r = vx + vw + 90; view.b = vy + vh + 90;
+  ctx.save();
+  ctx.translate(-vx, -vy);
+  // blit della sola porzione visibile della mappa e dei decals
+  ctx.drawImage(mapCanvas, vx, vy, vw, vh, vx, vy, vw, vh);
+  ctx.drawImage(decalCanvas, vx, vy, vw, vh, vx, vy, vw, vh);
+  for (const o of loots) if (inView(o.x, o.y, 20)) drawLoot(ctx, o);
+  for (const o of orbs) if (inView(o.x, o.y, 12)) drawOrb(ctx, o);
+  for (const z of zombies.items) if (z.active && inView(z.x, z.y, z.r + 10)) drawZombie(ctx, z);
+  if (state !== 'menu') {
+    const blink = player.invuln > 0 && Math.floor(time * 18) % 2 === 0;
+    if (!blink) drawZioPeppe(ctx, player.x, player.y, player.aim,
+      { scale:1, walkT:player.walkT, moving:player.moving, moveAngle:player.moveAngle, muzzle:player.muzzle });
+  }
+  for (const b of bullets.items) {
+    if (!b.active || !inView(b.x, b.y, 10)) continue;
+    ctx.fillStyle = b.crit ? '#ffb020' : '#f5e6b8';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(245,230,184,.35)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * .022, b.y - b.vy * .022); ctx.stroke();
+  }
+  for (const p of particles.items) {
+    if (!p.active || !inView(p.x, p.y, 6)) continue;
+    const a = clamp(p.life / p.maxLife, 0, 1);
+    if (p.text) {
+      ctx.globalAlpha = a; ctx.fillStyle = p.col;
+      ctx.font = '19px VT323'; ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y); ctx.globalAlpha = 1;
+    } else {
+      ctx.globalAlpha = a; ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+    }
+  }
+  for (const t of canopy) drawCanopyTree(ctx, t); // chiome sopra zombie e player
+  ctx.restore();
+  if (state === 'playing') drawCrosshair();
+  // vignetta danno: tocco il DOM solo se l'opacità cambia davvero
+  dmgFlash = Math.max(0, dmgFlash - .03);
+  if (Math.abs(dmgFlash - vigLast) > .02) { vigLast = dmgFlash; ui.vignette.style.opacity = dmgFlash.toFixed(2); }
+}
+
+/* ============================================================
+   GAME LOOP — requestAnimationFrame
+   *** FIX DEL FREEZE: il frame successivo viene prenotato PRIMA di
+   eseguire la simulazione. Prima, se update() lanciava un'eccezione
+   (come la shake() mancante), requestAnimationFrame non veniva mai
+   richiamato e il loop moriva, congelando tutto il gioco. Ora un
+   errore viene logghato ma il gioco continua a girare. ***
+   In più: contatore FPS (aggiornato 2 volte al secondo) e dt clampato.
+============================================================ */
+let last = performance.now();
+let fpsT = 0, fpsN = 0, fpsShown = -1;
+function frame(now) {
+  requestAnimationFrame(frame); // prenota il prossimo frame PER PRIMA COSA
+  const rawDt = (now - last) / 1000; last = now;
+  const dt = Math.min(Math.max(rawDt, 0), 1 / 30); // dt bloccato: fisica stabile anche con hitch
+  // FPS meter
+  if (rawDt > 0 && rawDt < 1) { fpsT += rawDt; fpsN++; }
+  if (fpsT >= .5) {
+    const f = Math.round(fpsN / fpsT);
+    if (f !== fpsShown) { fpsShown = f; ui.fps.textContent = f + ' FPS'; }
+    fpsT = 0; fpsN = 0;
+  }
+  try {
+    if (state === 'playing') update(dt);
+    else if (state === 'menu') updateMenu(dt);
+  } catch (err) { console.error('[ZioPeppe] errore in update:', err); }
+  shakePow *= Math.exp(-7 * dt);
+  try { render(); } catch (err) { console.error('[ZioPeppe] errore in render:', err); }
+}
+requestAnimationFrame(frame);
+
+/* ---------- Modalità "attract" del menu: camera in pan + zombie vaganti ---------- */
+// il rect del ritratto viene cachato: getBoundingClientRect a ogni frame
+// è un layout thrash che costa decine di millisecondi
+const portraitCv = $('portrait');
+const portraitCtx = portraitCv.getContext('2d');
+let portraitRect = null;
+function refreshPortraitRect() { portraitRect = portraitCv.getBoundingClientRect(); }
+
+function spawnWanderers() {
+  for (let i = 0; i < 9; i++) {
+    const z = spawnZombie(1, 'wander');
+    z.spd = rand(28, 55);
+  }
+}
+function updateMenu(dt) {
+  time += dt;
+  const t = time * .06;
+  const tx = WORLD.w / 2 + Math.cos(t) * 480 - vw / 2;
+  const ty = WORLD.h / 2 + Math.sin(t * 1.3) * 300 - vh / 2;
+  cam.x = vw >= WORLD.w ? (WORLD.w - vw) / 2 : clamp(tx, 0, WORLD.w - vw);
+  cam.y = vh >= WORLD.h ? (WORLD.h - vh) / 2 : clamp(ty, 0, WORLD.h - vh);
+  for (const z of zombies.items) {
+    if (!z.active || z.mode !== 'wander') continue;
+    z.ph += dt; z.flash = 0;
+    z.wtimer -= dt;
+    if (z.wtimer <= 0) { z.wdir = rand(0, TAU); z.wtimer = rand(1.5, 3.5); }
+    z.ang = z.wdir;
+    z.x += Math.cos(z.wdir) * z.spd * dt; z.y += Math.sin(z.wdir) * z.spd * dt;
+    if (z.x < 60 || z.x > WORLD.w - 60) z.wdir = Math.PI - z.wdir;
+    if (z.y < 60 || z.y > WORLD.h - 60) z.wdir = -z.wdir;
+    collideObstacles(z);
+  }
+  // ritratto di ZioPeppe che segue il cursore
+  if (!portraitRect || !portraitRect.width) refreshPortraitRect();
+  portraitCtx.setTransform(1, 0, 0, 1, 0, 0);
+  portraitCtx.clearRect(0, 0, portraitCv.width, portraitCv.height);
+  const aim = Math.atan2(mouse.y - (portraitRect.top + portraitRect.height / 2),
+                         mouse.x - (portraitRect.left + portraitRect.width / 2));
+  const bob = Math.sin(time * 2.2) * 3;
+  drawZioPeppe(portraitCtx, portraitCv.width / 2, portraitCv.height / 2 + bob, aim,
+    { scale:3.2, walkT:time * 2, moving:false, moveAngle:aim, muzzle:0 });
+}
+function rigeneraSfondoMenu() {
+  zombies.clear(); zAlive = 0;
+  buildMap(selectedMap);
+  spawnWanderers();
+}
+
+/* ---------- Cambio di scena ---------- */
+function resetRun() {
+  zombies.clear(); bullets.clear(); particles.clear();
+  orbs = []; loots = [];
+  zAlive = 0; kills = 0; runTime = 0;
+  wave = 0; waveActive = false; waveTotal = 0; waveSpawned = 0;
+  spawnTimer = 0; nextWaveDelay = 0; upgradeOpen = false;
+  dmgFlash = 0; shakePow = 0;
+  for (const k in hudPrev) delete hudPrev[k]; // forza il refresh del HUD
+  decalCtx.clearRect(0, 0, WORLD.w, WORLD.h);
+}
+function startGame() {
+  initAudio();
+  resetRun();
+  buildMap(selectedMap);   // mappa rigenerata a ogni run
+  resetPlayer();
+  cam.x = clamp(player.x - vw / 2, 0, Math.max(0, WORLD.w - vw));
+  cam.y = clamp(player.y - vh / 2, 0, Math.max(0, WORLD.h - vh));
+  state = 'playing';
+  document.body.classList.add('playing');
+  hide('menu'); hide('gameover'); hide('pauseOverlay'); hide('upgradeModal');
+  show('hud');
+  nextWaveDelay = 1.6;
+  updateHUD();
+}
+function goToMenu() {
+  resetRun();
+  state = 'menu';
+  document.body.classList.remove('playing');
+  hide('gameover'); hide('hud'); hide('pauseOverlay'); hide('upgradeModal');
+  show('menu');
+  rigeneraSfondoMenu();
+  refreshPortraitRect(); // il menu è di nuovo visibile: ricalcolo il rect del ritratto
+}
+
+/* ---------- Avvio ---------- */
+bakeZombieSprites();                 // sprite zombie cotti una volta sola
+resize();                            // imposta anche il rect del ritratto
+drawMiniPreview($('prevCity'), 'city');
+drawMiniPreview($('prevCountry'), 'country');
+setDiff('normale');
+rigeneraSfondoMenu();                // menu con la mappa città di sfondo
+if (document.fonts && document.fonts.ready)
+  document.fonts.ready.then(refreshPortraitRect).catch(() => {});
+</script>
+</body>
+</html>
