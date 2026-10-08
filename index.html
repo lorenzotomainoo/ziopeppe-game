@@ -837,14 +837,20 @@ function navDir(z, dt) {
     const ci = pfCell(z.x, z.y);
     dx = pf.fx[ci]; dy = pf.fy[ci];
   }
-  if (dx === 0 && dy === 0) { // cella irraggiungibile: inseguimento diretto
+  // *** FIX: fallback anche per valori non finiti, non solo per (0,0) ***
+  if (!(isFinite(dx) && isFinite(dy)) || (dx === 0 && dy === 0)) {
     const d = Math.max(1, dist(z.x, z.y, player.x, player.y));
     dx = (player.x - z.x) / d; dy = (player.y - z.y) / d;
   }
-  const k = Math.min(1, dt * 10); // smoothing anti-zig-zag
-  z.nvx = lerp(z.nvx, dx, k); z.nyv = lerp(z.nyv, dy, k);
-  const l = Math.hypot(z.nvx, z.nyv) || 1;
-  z.tx = z.nvx / l; z.ty = z.nyv / l;
+  const k = Math.min(1, dt * 10);
+  z.nvx = lerp(z.nvx, dx, k); z.nvy = lerp(z.nvy, dy, k);
+  let l = Math.hypot(z.nvx, z.nvy);
+  if (!isFinite(l) || l < 0.01) { // *** FIX: direzione corrotta -> punto dritto al player ***
+    const d = Math.max(1, dist(z.x, z.y, player.x, player.y));
+    z.nvx = (player.x - z.x) / d; z.nvy = (player.y - z.y) / d;
+    l = 1;
+  }
+  z.tx = z.nvx / l; z.ty = z.nvy / l;
 }
 
 /* ============================================================
@@ -1179,6 +1185,7 @@ function spawnZombie(w, mode = 'hunt', forceType) {
   z.maxHp = z.hp = Math.round(T.hp * (1 + (w - 1) * .28) * diff.zHp);
   z.dmg = T.dmg * (1 + (w - 1) * .06) * diff.zDmg;
   z.spd = T.spd * (1 + Math.min(w * .02, .5)) * diff.zSpd * rand(.92, 1.08);
+  z.xp = T.xp; // *** FIX: riga persa nella riscrittura — senza questa gli orbs droppano NaN e corrompono l'XP ***
   z.flash = 0; z.pushX = 0; z.pushY = 0; z.ph = rand(0, TAU);
   z.burnT = 0; z.slowT = 0; z.droneCd = 0; z.navT = 0; z.useFlow = false;
   z.nvx = 1; z.nvy = 0; z.tx = 1; z.ty = 0;
@@ -1186,12 +1193,25 @@ function spawnZombie(w, mode = 'hunt', forceType) {
   if (mode === 'hunt') {
     const cx = cam.x + vw / 2, cy = cam.y + vh / 2;
     const R = Math.hypot(vw, vh) / 2 + rand(70, 150);
+    let placed = false;
     for (let i = 0; i < 12; i++) {
       const a = rand(0, TAU);
       const x = clamp(cx + Math.cos(a) * R, 40, WORLD.w - 40);
       const y = clamp(cy + Math.sin(a) * R, 40, WORLD.h - 40);
-      if (!pointBlocked(x, y, z.r + 4)) { z.x = x; z.y = y; break; }
-      z.x = x; z.y = y;
+      // *** FIX: la posizione deve essere valida (finita E libera) per essere accettata ***
+      if (isFinite(x) && isFinite(y) && !pointBlocked(x, y, z.r + 4)) { z.x = x; z.y = y; placed = true; break; }
+    }
+    if (!placed) {
+      // *** FIX: fallback garantito — anello attorno al player a raggio crescente, sempre su punto libero ***
+      for (let rr = 420; rr <= 980 && !placed; rr += 140) {
+        for (let i = 0; i < 10; i++) {
+          const a = rand(0, TAU);
+          const x = clamp(player.x + Math.cos(a) * rr, 40, WORLD.w - 40);
+          const y = clamp(player.y + Math.sin(a) * rr, 40, WORLD.h - 40);
+          if (!pointBlocked(x, y, z.r + 4)) { z.x = x; z.y = y; placed = true; break; }
+        }
+      }
+      if (!placed) { z.x = clamp(player.x + 360, 40, WORLD.w - 40); z.y = clamp(player.y, 40, WORLD.h - 40); }
     }
     zAlive++;
   } else {
@@ -1598,15 +1618,23 @@ function updateWave(dt) {
     return;
   }
   if (!waveActive) return;
+  // *** FIX — WATCHDOG: zAlive viene ricalcolato ogni frame dagli zombie
+  // realmente attivi in caccia. Qualunque desincronizzazione del contatore
+  // (l'unica cosa che può chiudere la porta dello spawn E bloccare la fine
+  // dell'ondata) si guarisce da sola entro un frame. ***
+  let alive = 0;
+  for (const z of zombies.items) if (z.active && z.mode === 'hunt') alive++;
+  zAlive = alive;
+  if (!isFinite(spawnTimer)) spawnTimer = .5; // *** FIX: guardia anti-valori corrotti ***
   spawnTimer -= dt;
   if (spawnTimer <= 0 && waveSpawned < waveTotal && zAlive < ALIVE_CAP) {
-    const grp = Math.min(groupSize, waveTotal - waveSpawned, ALIVE_CAP - zAlive);
+    const grp = Math.max(1, Math.min(groupSize, waveTotal - waveSpawned, ALIVE_CAP - zAlive));
     for (let i = 0; i < grp; i++) { spawnZombie(wave); waveSpawned++; }
     spawnTimer = spawnInterval;
   }
   if (waveSpawned >= waveTotal && zAlive === 0) {
     waveActive = false;
-    ebullets.clear(); // l'acido in volo evapora a fine ondata
+    ebullets.clear();
     if (player.endWaveHeal > 0) player.hp = Math.min(player.maxHp, player.hp + player.endWaveHeal);
     openUpgrade('wave');
   }
@@ -1642,6 +1670,7 @@ function update(dt) {
 function startWave(n) {
   wave = n;
   waveTotal = Math.max(4, Math.round((5 + n * 3 + n * n * .22) * diff.density));
+  if (!isFinite(waveTotal) || waveTotal < 1) waveTotal = 4; // *** FIX: guardia anti-NaN ***
   waveSpawned = 0; waveActive = true;
   spawnInterval = Math.max(.7, 2.2 - n * .12);
   groupSize = Math.min(3 + Math.floor(n / 2), 8);
